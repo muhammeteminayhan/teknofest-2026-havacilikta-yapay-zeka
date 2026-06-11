@@ -1,0 +1,15 @@
+# Görev 2 — Visual Odometry çekirdek bağımlılıkları
+opencv-python>=4.10
+numpy>=1.24
+matplotlib>=3.7
+
+# Yarışma bağlantı arayüzü (TAKIM_BAGLANTI_ARAYUZU) için
+requests>=2.25
+python-decouple
+tqdm
+pillow
+
+# (Opsiyonel — Faz 2+ öğrenilen özellikler: SuperPoint/LightGlue)
+# torch
+# kornia
+# lightglue

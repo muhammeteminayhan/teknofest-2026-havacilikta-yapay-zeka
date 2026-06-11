@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Credentials
+.env
+!example.env
+
+# Büyük veri dosyaları — MP4 videolar (~600MB her biri)
+THYZ_2026_Ornek_Veri_Seti/*.MP4
+THYZ_2026_Ornek_Veri_Seti/*.mp4
+
+# Yarışma arşivi (kod zaten repoda)
+*.zip
+
+# Kök dizindeki orijinal PDF'ler (docs/ altında düzenli kopyaları var)
+2026_HAVACILIKTA_YAPAY_ZEKA_TEKNIK_SARTNAME_TR_v1_2026_02_21_W48vr.pdf
+2026_HAVACILIKTA_YAPAY_ZEKA_TR_20_02_v2_gTb4Z.pdf
+
+# VO çıktıları — üretilmiş dosyalar (yeniden oluşturulabilir)
+gorev2_visual_odometry/outputs/*.npz
+gorev2_visual_odometry/outputs/*.png
+gorev2_visual_odometry/_frames/
+
+# Logs
+*.log
+_logs/
+
+# OS
+.DS_Store
+Thumbs.db
