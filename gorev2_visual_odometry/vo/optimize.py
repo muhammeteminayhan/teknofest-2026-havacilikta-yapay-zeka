@@ -194,8 +194,12 @@ def align_increments_interp(inc: np.ndarray, raw: np.ndarray, healths: np.ndarra
 
 
 def _smooth_axis(v_axis: np.ndarray, healthy: np.ndarray, g_axis: np.ndarray,
-                 w_o: np.ndarray, w_a: float) -> np.ndarray:
-    """Tek eksen tridiyagonal smoother. v_axis[i] = i. kareye ait artış (i≥1)."""
+                 w_o: np.ndarray, w_a: float, extra=None) -> np.ndarray:
+    """
+    Tek eksen tridiyagonal smoother. v_axis[i] = i. kareye ait artış (i≥1).
+    extra : opsiyonel (idx_dizi, val_dizi, w_dizi) — sanal çapalar (loop closure);
+            sağlıklı GT çapalarına ek, kendi (genelde daha düşük) ağırlıklarıyla.
+    """
     n = len(v_axis)
     main = np.zeros(n)
     lower = np.zeros(n - 1)      # M[i, i-1]
@@ -208,10 +212,16 @@ def _smooth_axis(v_axis: np.ndarray, healthy: np.ndarray, g_axis: np.ndarray,
         lower[i - 1] += -w
         rhs[i] += w * v_axis[i]
         rhs[i - 1] += -w * v_axis[i]
-    # Çapa terimleri
+    # Çapa terimleri (sağlıklı GT)
     idx = np.where(healthy)[0]
     main[idx] += w_a
     rhs[idx] += w_a * g_axis[idx]
+    # Sanal çapalar (loop closure) — per-çapa ağırlık
+    if extra is not None:
+        ei, ev, ew = extra
+        for k in range(len(ei)):
+            main[ei[k]] += ew[k]
+            rhs[ei[k]] += ew[k] * ev[k]
     M = sp.diags([lower, main, lower], offsets=[-1, 0, 1], format="csc")
     return spla.spsolve(M, rhs)
 
@@ -219,12 +229,15 @@ def _smooth_axis(v_axis: np.ndarray, healthy: np.ndarray, g_axis: np.ndarray,
 def smooth_trajectory(batch: BatchData, w_anchor: float = 1e4,
                       conf_floor: float = 0.15, stage2: bool = False,
                       kf_step: int = 50, align_mode: str = "interp",
-                      return_diag: bool = False):
+                      return_diag: bool = False, loop_anchors=None):
     """
     Global smoothing. align_mode="interp" (varsayılan): segment-bazlı GT-kalibreli
     ölçek/yön interpolasyonu (pencere-içi ölçek+heading drift'ini giderir); "global":
     tek global Umeyama. stage2=True ise ek yavaş-değişen yaw/ölçek düzeltmesi.
     Sonra doğrusal çapalı smoother. Sağlıklı karelerde GT echo edilir.
+
+    loop_anchors : opsiyonel LoopAnchor listesi (loop_closure.detect çıktısı) — sağlıksız
+        karelere görsel revisit eşleşmesinden gelen sanal mutlak çapalar (çapasız kuyruk).
     """
     chain = build_raw_chain(batch.fms)
     inc, raw = chain["inc"], chain["raw"]
@@ -245,9 +258,20 @@ def smooth_trajectory(batch: BatchData, w_anchor: float = 1e4,
     if stage2:
         v = correct_drift(v, healths, gts, w_o, kf_step=kf_step)
 
+    # Sanal çapaları (loop closure) per-eksen (idx, val, w) dizilerine çevir; yalnızca
+    # sağlıksız karelere uygula (sağlıklılar zaten GT ile çapalı).
+    extra_ax = [None, None, None]
+    if loop_anchors:
+        li = np.array([a.idx for a in loop_anchors if not healths[a.idx]], dtype=int)
+        lw = np.array([a.weight for a in loop_anchors if not healths[a.idx]], dtype=float)
+        lx = np.array([a.xyz for a in loop_anchors if not healths[a.idx]], dtype=float)
+        if len(li):
+            extra_ax = [(li, lx[:, ax], lw) for ax in range(3)]
+
     pred = np.zeros((n, 3))
     for ax in range(3):
-        pred[:, ax] = _smooth_axis(v[:, ax], healths, gts[:, ax], w_o, w_anchor)
+        pred[:, ax] = _smooth_axis(v[:, ax], healths, gts[:, ax], w_o, w_anchor,
+                                   extra=extra_ax[ax])
 
     # Sağlıklı karelerde GT'yi aynen ver (echo; en iyi skor)
     pred[healths] = gts[healths]

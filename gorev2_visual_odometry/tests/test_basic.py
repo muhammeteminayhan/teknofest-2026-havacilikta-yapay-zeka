@@ -160,10 +160,27 @@ def test_batch_smooth():
     print("test_batch_smooth PASS")
 
 
+def test_loop_anchor():
+    """Sanal çapa (loop closure) mekanizması: bir kareyi verilen mutlak değere çeker."""
+    from vo.optimize import _smooth_axis
+    n = 100
+    v = np.ones(n); v[0] = 0           # sabit hareket → çapasız p[99]≈99
+    healthy = np.zeros(n, dtype=bool); healthy[0] = True
+    g = np.zeros(n); g[0] = 0.0
+    w_o = np.ones(n)
+    p_no = _smooth_axis(v, healthy, g, w_o, 1e5)
+    assert abs(p_no[99] - 99) < 1.0
+    # 99. kareye sanal çapa (değer=50) → o kare 50'ye çekilmeli
+    extra = (np.array([99]), np.array([50.0]), np.array([1e5]))
+    p_ex = _smooth_axis(v, healthy, g, w_o, 1e5, extra=extra)
+    assert abs(p_ex[99] - 50) < 1.0, p_ex[99]
+    print("test_loop_anchor PASS")
+
+
 def run_all():
     tests = [test_calibration_parse, test_umeyama_3d, test_umeyama_2d,
              test_motion_translation, test_pipeline_smoke,
-             test_linear_smoother, test_batch_smooth]
+             test_linear_smoother, test_batch_smooth, test_loop_anchor]
     failed = 0
     for t in tests:
         try:

@@ -36,6 +36,11 @@ from evaluate import _is_healthy_frame, _plots  # noqa: E402
 
 
 def main():
+    # Windows konsolu cp1254 → Unicode (→, ≈ vb.) çökmesini önle.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--modality", choices=["rgb", "thermal"], default="rgb")
     ap.add_argument("--step", type=int, default=4)
@@ -55,6 +60,13 @@ def main():
     ap.add_argument("--max-frames", type=int, default=0)
     ap.add_argument("--cache", action="store_true", help="Pass-1 sonuçlarını önbelleğe al/oku.")
     ap.add_argument("--tag", default="batch")
+    ap.add_argument("--loop", action="store_true",
+                    help="Loop closure: çapasız kuyruk için görsel revisit eşleme (DISK+LightGlue).")
+    ap.add_argument("--loop-min-inliers", type=int, default=50)
+    ap.add_argument("--loop-weight", type=float, default=50.0,
+                    help="Sanal çapa ağırlığı (odometri ~1, gerçek GT 1e4; yaklaşık çapa için orta değer).")
+    ap.add_argument("--loop-db-stride", type=int, default=10)
+    ap.add_argument("--loop-query-stride", type=int, default=10)
     args = ap.parse_args()
 
     if args.max_features is not None:
@@ -144,6 +156,62 @@ def main():
     print(f"  Sağlıklı segment (echo): {err[healths].mean():.4f} m")
     print(f"  Hizalama olcegi s~irtifa={diag['sim2d'].s:.2f}, z-olcek cz={diag['cz']:.2f}")
     print("=" * 60)
+
+    # ---- Loop closure (opsiyonel): çapasız kuyruk için görsel revisit eşleme ----
+    if args.loop:
+        from vo.loop_closure import LoopCloser, build_keyframes, LoopAnchor
+        # Çapa önbelleği: (idx, xyz, n_inlier) ağırlıktan bağımsız → ağırlık taraması ucuz.
+        lc_cache = os.path.join(
+            config.OUTPUTS_DIR,
+            f"_cache_loop_{args.modality}_step{args.step}_{args.health_mode}"
+            f"_db{args.loop_db_stride}_q{args.loop_query_stride}_mi{args.loop_min_inliers}.npz")
+        tlc = time.perf_counter()
+        if args.cache and os.path.exists(lc_cache):
+            la = np.load(lc_cache)
+            a_idx, a_xyz, a_ninl = la["idx"], la["xyz"], la["ninl"]
+            print(f"\nLoop closure: çapalar ÖNBELLEKTEN ({len(a_idx)} loop).")
+        else:
+            print("\nLoop closure: anahtar-kareler çıkarılıyor (DISK+LightGlue)...")
+            closer = LoopCloser(proc_max_width=args.proc_width)
+            src2 = VideoFrameSource(video, step=args.step, max_width=None, to_gray=False)
+
+            def lc_iter():
+                j = 0
+                for oi, fr in src2:
+                    if j >= n:
+                        break
+                    yield j, fr
+                    j += 1
+
+            db, queries = build_keyframes(closer, lc_iter(), healths, gts,
+                                          db_stride=args.loop_db_stride,
+                                          query_stride=args.loop_query_stride)
+            det = closer.detect(db, queries, min_inliers=args.loop_min_inliers)
+            a_idx = np.array([a.idx for a in det], dtype=int)
+            a_xyz = np.array([a.xyz for a in det], dtype=float).reshape(-1, 3)
+            a_ninl = np.array([a.n_inlier for a in det], dtype=int)
+            print(f"  DB={len(db)} anahtar-kare, sorgu={len(queries)}, "
+                  f"bulunan loop={len(a_idx)} ({time.perf_counter()-tlc:.0f}s)")
+            if args.cache:
+                os.makedirs(config.OUTPUTS_DIR, exist_ok=True)
+                np.savez(lc_cache, idx=a_idx, xyz=a_xyz, ninl=a_ninl)
+
+        anchors = [LoopAnchor(int(i), x, args.loop_weight, int(ni))
+                   for i, x, ni in zip(a_idx, a_xyz, a_ninl)]
+        pred2 = smooth_trajectory(batch, w_anchor=args.w_anchor, align_mode=args.align_mode,
+                                  loop_anchors=anchors)
+        err2 = np.linalg.norm(pred2 - gts, axis=1)
+        E2 = float(err2[un].mean())
+        print(f"  loop sayısı={len(a_idx)}, ağırlık={args.loop_weight:g} "
+              f"({time.perf_counter()-tlc:.0f}s)")
+        if len(a_idx):
+            # Yalnızca eşleşen (sanal çapalı) karelerdeki kazanç:
+            print(f"  Loop kareleri E: {err[a_idx].mean():.1f}m -> {err2[a_idx].mean():.1f}m")
+        print(f"  >>> RESMİ METRİK (loop closure): E = {E2:.3f} m  "
+              f"(loop'suz: {E:.3f} m)")
+        print(f"      Medyan={np.median(err2[un]):.3f}  Maks={err2[un].max():.3f} m")
+        print("=" * 60)
+        pred, err, E = pred2, err2, E2          # grafikler loop-düzeltilmiş sonucu göstersin
 
     os.makedirs(config.OUTPUTS_DIR, exist_ok=True)
     base = os.path.join(config.OUTPUTS_DIR, f"evalB_{args.modality}_{args.tag}_{args.health_mode}_step{args.step}")
