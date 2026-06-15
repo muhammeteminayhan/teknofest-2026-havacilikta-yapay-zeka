@@ -142,7 +142,7 @@ def main():
     print(f"    Medyan={np.median(err[un]):.3f}  P90={np.percentile(err[un],90):.3f}  "
           f"Maks={err[un].max():.3f} m")
     print(f"  Sağlıklı segment (echo): {err[healths].mean():.4f} m")
-    print(f"  Hizalama ölçeği s≈irtifa={diag['sim2d'].s:.2f}, z-ölçek cz={diag['cz']:.2f}")
+    print(f"  Hizalama olcegi s~irtifa={diag['sim2d'].s:.2f}, z-olcek cz={diag['cz']:.2f}")
     print("=" * 60)
 
     os.makedirs(config.OUTPUTS_DIR, exist_ok=True)

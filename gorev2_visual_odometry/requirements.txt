@@ -10,7 +10,11 @@ python-decouple
 tqdm
 pillow
 
-# (Opsiyonel — Faz 2+ öğrenilen özellikler: SuperPoint/LightGlue)
+# (Opsiyonel — öğrenilen özellik ön-yüzü ve loop closure için)
+# RTX 5060/Blackwell: torch'u cu128 ile kur (bkz. kök README).
 # torch
-# kornia
-# lightglue
+# kornia            # DISK/ALIKED + LightGlue (vo/frontend.py LearnedFrontEnd, loop closure)
+#
+# NOT (ampirik bulgu): öğrenilen ön-yüz (DISK+LightGlue) sıralı VO drift'ini bu veride
+# anlamlı düşürmedi (KLT ile ~aynı: tail 177.8 vs 179.8m). Asıl kazanç loop closure'da
+# (geniş-bazlı revisit eşleme) — öğrenilen eşleştirme orada kullanılır.

@@ -122,6 +122,13 @@ def make_frontend(backend: str, max_features: int = 1500, **kw):
         return ORBFrontEnd(max_features=max_features)
     if backend == "sift":
         return SIFTFrontEnd(max_features=max_features)
+    if backend in ("learned", "disk", "aliked"):
+        # Öğrenilen ön-yüz (kornia: DISK/ALIKED + LightGlue). Ağır bağımlılık
+        # (torch/kornia) yalnızca burada (LearnedFrontEnd.__init__) yüklenir.
+        extractor = "disk" if backend == "learned" else backend
+        return LearnedFrontEnd(extractor=extractor,
+                               max_features=max(max_features, 2048),
+                               device=kw.get("device"))
     raise ValueError(f"Bilinmeyen frontend: {backend}")
 
 
@@ -145,4 +152,80 @@ class SIFTFrontEnd:
         p_prev = np.float32([self.prev_kp[m.queryIdx].pt for m in good]) if good else np.empty((0, 2))
         p_cur = np.float32([kp[m.trainIdx].pt for m in good]) if good else np.empty((0, 2))
         self.prev_gray, self.prev_kp, self.prev_des = gray, kp, des
+        return p_prev, p_cur
+
+
+class LearnedFrontEnd:
+    """
+    Öğrenilen özellik ön-yüzü (kornia: DISK/ALIKED tespit + LightGlue eşleştirme).
+
+    KLT/ORB'a göre büyük açı/ölçek/aydınlatma değişiminde çok daha az drift üretir
+    (literatürde aerial VO'da ~%20-35 drift azaltımı). GPU'da çalışır; 8GB'a sığar.
+    Ağır bağımlılıklar (torch/kornia) yalnızca burada tembel yüklenir → frontend.py
+    torch'suz import edilebilir (CI güvenli).
+
+    Ortak arayüz: process(gray) -> (p_prev, p_cur)  (Nx2 piksel), KLT ile aynı sözleşme.
+    """
+
+    def __init__(self, extractor: str = "disk", max_features: int = 2048,
+                 device: str | None = None):
+        import torch
+        import kornia.feature as KF
+        self._torch = torch
+        self._KF = KF
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = device
+        self.extractor_name = extractor
+        self.max_features = max_features
+
+        if extractor == "aliked":
+            self.extractor = KF.ALIKED(model_name="aliked-n16",
+                                       max_num_keypoints=max_features).to(device).eval()
+        else:  # disk (varsayılan, gürbüz)
+            self.extractor = KF.DISK.from_pretrained("depth").to(device).eval()
+        self.matcher = KF.LightGlueMatcher(extractor).to(device).eval()
+        self._prev = None      # (kps tensor, descs tensor, (h,w))
+
+    def _to_tensor(self, gray: np.ndarray):
+        t = self._torch
+        img = gray
+        if img.ndim == 2:                       # gri → 3 kanal (DISK/ALIKED RGB ister)
+            img = np.repeat(img[:, :, None], 3, axis=2)
+        ten = t.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1)[None]
+        return ten.float().to(self.device) / 255.0
+
+    def _extract(self, gray: np.ndarray):
+        t, KF = self._torch, self._KF
+        ten = self._to_tensor(gray)
+        hw = (ten.shape[-2], ten.shape[-1])
+        with t.inference_mode():
+            if self.extractor_name == "aliked":
+                feats = self.extractor(ten)[0]
+            else:
+                feats = self.extractor(ten, n=self.max_features,
+                                       pad_if_not_divisible=True)[0]
+            kps, descs = feats.keypoints, feats.descriptors
+        return kps, descs, hw
+
+    def process(self, gray: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        t, KF = self._torch, self._KF
+        kps, descs, hw = self._extract(gray)
+        if self._prev is None or self._prev[0].shape[0] < 4 or kps.shape[0] < 4:
+            self._prev = (kps, descs, hw)
+            return np.empty((0, 2)), np.empty((0, 2))
+
+        kps0, descs0, hw0 = self._prev
+        with t.inference_mode():
+            laf0 = KF.laf_from_center_scale_ori(kps0[None])
+            laf1 = KF.laf_from_center_scale_ori(kps[None])
+            _, idxs = self.matcher(descs0, descs, laf0, laf1, hw0, hw)
+
+        if idxs.shape[0] == 0:
+            self._prev = (kps, descs, hw)
+            return np.empty((0, 2)), np.empty((0, 2))
+        idxs = idxs.cpu().numpy()
+        p_prev = kps0.cpu().numpy()[idxs[:, 0]].astype(np.float32)
+        p_cur = kps.cpu().numpy()[idxs[:, 1]].astype(np.float32)
+        self._prev = (kps, descs, hw)
         return p_prev, p_cur
