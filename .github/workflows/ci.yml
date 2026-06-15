@@ -19,5 +19,8 @@ jobs:
       - name: Bağımlılıkları kur
         run: pip install -r gorev2_visual_odometry/requirements.txt
 
-      - name: Birim testleri çalıştır (7/7 sentetik — video gerekmez)
+      - name: Görev 2 birim testleri (7/7 sentetik — video gerekmez)
         run: python gorev2_visual_odometry/tests/test_basic.py
+
+      - name: Görev 1 birim testleri (5/5 — torch/ultralytics gerekmez, cv2+numpy)
+        run: python gorev1_nesne_tespiti/tests/test_g1.py

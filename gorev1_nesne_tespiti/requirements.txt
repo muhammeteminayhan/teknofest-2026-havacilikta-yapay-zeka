@@ -1,0 +1,14 @@
+# Görev 1 — Nesne Tespiti bağımlılıkları
+#
+# NOT: RTX 5060 (Blackwell, sm_120) için torch'u CUDA 12.8 ile kur:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# Sonra:
+#   pip install -r gorev1_nesne_tespiti/requirements.txt
+
+ultralytics>=8.3        # YOLOv11
+sahi>=0.11.2            # Slicing Aided Hyper Inference (küçük nesne)
+opencv-python>=4.10
+numpy>=1.24
+pillow>=10.0
+tqdm
+requests

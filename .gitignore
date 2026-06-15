@@ -37,6 +37,21 @@ gorev2_visual_odometry/outputs/*.npz
 gorev2_visual_odometry/outputs/*.png
 gorev2_visual_odometry/_frames/
 
+# Dış veri setleri (scriptlerle indirilir, commit edilmez)
+datasets/
+
+# Model ağırlıkları (önceden indirilir, çevrimdışı; commit edilmez)
+**/agirliklar/*
+!**/agirliklar/.gitkeep
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# Görev 1 tespit çıktıları (üretilmiş)
+gorev1_nesne_tespiti/outputs/*.jpg
+gorev1_nesne_tespiti/outputs/*.png
+
 # Logs
 *.log
 _logs/

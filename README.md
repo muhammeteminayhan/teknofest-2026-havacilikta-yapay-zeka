@@ -4,20 +4,44 @@
 **Yarışma:** TEKNOFEST 2026 Havacılıkta Yapay Zeka  
 **Simülasyon tarihi:** 09.07.2026  
 
+Alt-görüş hava kamerasından (FHD/4K, 7.5 fps, RGB *veya* termal) gelen kareler üzerinde
+üç görev: nesne tespiti, pozisyon kestirimi ve görüntü eşleme. Üç görev de **aynı video
+akışını ve bağlantı arayüzünü** paylaşır; kare başına **tek birleşik sonuç paketi** gönderilir.
+
 ---
 
-## Görevler
+## Görevler ve Puan
 
-| Görev | Açıklama | Durum |
-|-------|----------|-------|
-| **Görev 1** | [Nesne Tespiti](gorev1_nesne_tespiti/) | Devam ediyor |
-| **Görev 2** | [Pozisyon Tespiti / Visual Odometry](gorev2_visual_odometry/) | ✅ Tamamlandı |
+| Görev | Açıklama | Puan | Durum |
+|-------|----------|------|-------|
+| **Görev 1** | [Nesne Tespiti](gorev1_nesne_tespiti/) (taşıt/insan/UAP/UAİ + hareket/iniş) | %25 | 🟡 Baseline çalışıyor |
+| **Görev 2** | [Pozisyon Tespiti / Visual Odometry](gorev2_visual_odometry/) | %40 | ✅ Tamamlandı |
+| **Görev 3** | [Görüntü Eşleme](gorev3_goruntu_esleme/) (referans nesne) | %25 | ⚪ Planlandı |
+| Rapor + Sunum | — | %10 | — |
+
+> **Görevler bağlantılı:** ortak ego-hareket/kamera/veri katmanı `ortak/` altında.
+> Görev 1'in "hareketli/sabit" ayrımı, Görev 2'nin görsel-odometri homografisini paylaşır.
+
+---
+
+## Repo Yapısı
+
+```
+ortak/                     # paylaşılan çekirdek (ego_hareket, veri, kamera)
+gorev1_nesne_tespiti/      # YOLOv11 + SAHI; hareket + iniş + entegrasyon
+gorev2_visual_odometry/    # ✅ hibrit VO + batch global optimizasyon
+gorev3_goruntu_esleme/     # (planlandı) RoMa/MatchAnything eşleme
+TAKIM_BAGLANTI_ARAYUZU/    # yarışma bağlantı arayüzü (değişmez)
+THYZ_2026_Ornek_Veri_Seti/ # örnek veri (MP4'ler gitignore)
+datasets/                  # dış veri setleri (gitignore; scriptlerle indirilir)
+docs/                      # teknik şartname
+```
 
 ---
 
 ## Görev 2 — Visual Odometry Sonuçları
 
-Alt-görüş kameradan GPS olmadan `x,y,z` pozisyon kestirimi. Batch global optimizasyon ile:
+GPS olmadan `x,y,z` pozisyon kestirimi. Batch global optimizasyon ile:
 
 | GPS Kesinti Süresi | Çevrimiçi `E` | **Batch `E`** | Batch Medyan |
 |--------------------|---------------|---------------|--------------|
@@ -33,37 +57,36 @@ Alt-görüş kameradan GPS olmadan `x,y,z` pozisyon kestirimi. Batch global opti
 ## Kurulum
 
 ```bash
-# Repoyu klonla
 git clone https://github.com/muhammeteminayhan/teknofest-2026-havacilikta-yapay-zeka.git
 cd teknofest-2026-havacilikta-yapay-zeka
 
-# Bağımlılıkları kur
+# Görev 2 (klasik VO — GPU gerekmez)
 pip install -r gorev2_visual_odometry/requirements.txt
 
-# Veri setini kur — sadece MP4 dosyaları gitignored, manuel olarak koy:
-#   THYZ_2026_Ornek_Veri_Seti/THYZ_2026_Ornek_Veri_1.MP4
-#   THYZ_2026_Ornek_Veri_Seti/THYZ_2026_Ornek_Veri_2_Termal.MP4
-# (CSV ve kalibrasyon dosyaları repoda zaten mevcut)
+# Görev 1 (YOLOv11+SAHI) — RTX 5060/Blackwell için CUDA 12.8'li torch:
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+pip install -r gorev1_nesne_tespiti/requirements.txt
 
-# Testleri çalıştır (veri seti gerekmez — tamamen sentetik)
-python gorev2_visual_odometry/tests/test_basic.py
+# Örnek veri: MP4 dosyaları gitignored → THYZ_2026_Ornek_Veri_Seti/ altına manuel koy
+# (CSV ve kalibrasyon repoda mevcut). MP4 yoksa baseline_demo örnek JPG'lere düşer.
 ```
+
+> **Yarışmada internet YOK.** Tüm model ağırlıkları önceden indirilip `*/agirliklar/`
+> altında çevrimdışı saklanmalıdır.
 
 ---
 
-## Görev 2 Çalıştırma
+## Çalıştırma
 
 ```bash
-# Batch değerlendirme (önerilen) — global optimizasyon + resmi metrik
-python gorev2_visual_odometry/scripts/evaluate_batch.py \
-    --modality rgb --step 4 --health-mode intermittent --dropout 300 --cache
+# --- Görev 1: Nesne Tespiti ---
+python gorev1_nesne_tespiti/baseline_demo.py --kare 8 --baslangic 900   # baseline duman testi
+python gorev1_nesne_tespiti/veri/indir_visdrone.py                      # dış veri (internetli makine)
+python gorev1_nesne_tespiti/tests/test_g1.py                            # birim testler
 
-# Entegrasyon kuru provası (sunucu olmadan)
-python gorev2_visual_odometry/scripts/replay_batch.py \
-    --step 4 --health-mode intermittent
-
-# Yarışma günü (tüm kareleri indir → optimize → gönder)
-python gorev2_visual_odometry/integration/main_batch.py
+# --- Görev 2: Visual Odometry ---
+python gorev2_visual_odometry/scripts/evaluate_batch.py --modality rgb --step 4 --health-mode intermittent --cache
+python gorev2_visual_odometry/tests/test_basic.py
 ```
 
 ---
@@ -76,16 +99,8 @@ develop  ← entegrasyon dalı
 feature/ ← bireysel geliştirme
 ```
 
-- `main`'e sadece PR ile merge edilir (1 onay gerekli)
-- PR açmadan önce: `python gorev2_visual_odometry/tests/test_basic.py` → 7/7 geçmeli
-- Büyük değişikliklerde `evaluate_batch.py` ile E değeri kontrol edilmeli
-
----
-
-## Bağımlılıklar
-
-- Python 3.11+
-- opencv-python ≥ 4.10, numpy ≥ 1.24, scipy, matplotlib, requests, tqdm, pillow
-- GPU gerekmez (klasik hat CPU'da ~35 kare/s)
+- `main`'e sadece PR ile merge edilir.
+- PR açmadan önce ilgili birim testler geçmeli:
+  `gorev1_nesne_tespiti/tests/test_g1.py` ve `gorev2_visual_odometry/tests/test_basic.py`.
 
 Detaylı şartname: [`docs/TEKNIK_SARTNAME.pdf`](docs/TEKNIK_SARTNAME.pdf)
