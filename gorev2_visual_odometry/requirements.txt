@@ -1,6 +1,7 @@
 # Görev 2 — Visual Odometry çekirdek bağımlılıkları
 opencv-python>=4.10
 numpy>=1.24
+scipy>=1.10            # batch global smoother (sparse çözüm + least_squares)
 matplotlib>=3.7
 
 # Yarışma bağlantı arayüzü (TAKIM_BAGLANTI_ARAYUZU) için
