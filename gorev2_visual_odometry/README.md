@@ -42,12 +42,20 @@ arasındaki **ortalama Öklid hatası** (`E`, düşük = iyi) ile yapılır.
 |---|---|---|---|
 | Aralıklı, 100 kare (~13 s) | ~25 m | **4.2 m** | 1.6 m |
 | Aralıklı, 200 kare (~27 s) | ~38 m | **8.7 m** | 4.3 m |
-| Aralıklı, 300 kare (~40 s) | ~50 m | **22 m** | 10.5 m |
+| Aralıklı, 300 kare (~40 s) | ~50 m | **22 m** → **16.9 m** (`--map`) | 10.5 m |
 | Aralıklı, 450 kare (~60 s) | — | **47 m** | 29.5 m |
-| Worst-case (1806 kare KESİNTİSİZ, çapasız kuyruk) | ~179 m | **129 m** (loop closure) | 69 m |
+| Worst-case (1806 kare KESİNTİSİZ, çapasız kuyruk) | ~179 m | **112 m** (`--map`) / 129 m (loop) | 61 m |
 
 - Batch, çapalanmış (bracketed) segmentlerde **5–50× iyileşme** sağlar; hata GPS
   kesinti süresine bağlıdır. Z ekseni her durumda ~1–3 m.
+- **Yoğun harita-tabanlı mutlak konumlandırma (`--map`, AVL/DSMAC — SEKTÖR YÖNTEMİ, ÖNERİLEN):**
+  sağlıklı GT'li kareler geo-referanslı harita; HER sağlıksız kare bu haritaya konumlanır
+  (seyrek loop closure'ın güçlü genellemesi). intermittent-300: **22 → 16.9m**; tail:
+  **179 → 112m** (loop closure'ın 129m'sini geçer). Konumlanan karelerde hata **~7m**
+  (homografi-rafine + otomatik kalibrasyon → loop closure'ın 29m tabanı kalktı).
+  Konvansiyon+ölçek sağlıklı çiftlerden otomatik kalibre. Bu, Baykar tarzı GPS'siz mutlak
+  görsel navigasyonun (IMU/uydu olmadığı için) yarışmaya uyarlanmış halidir. Sınır:
+  konumlanan kare sayısı (harita kapsamı) — daha yoğun sorgu/eşik = daha fazla kazanç.
 - **Çapasız kuyruk** (oturum sağlıksız biterse): **loop closure** ile 179m → **129m**
   (`--loop`). Yörünge GT-çapalı prefix bölgesini yeniden ziyaret ettiğinden (kuyruğun
   ~%20'si <50m), görsel revisit eşleme (DISK+LightGlue) o kareye sanal mutlak çapa verir;
