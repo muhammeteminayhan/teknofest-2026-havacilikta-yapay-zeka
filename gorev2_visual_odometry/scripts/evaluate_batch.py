@@ -67,6 +67,15 @@ def main():
                     help="Sanal çapa ağırlığı (odometri ~1, gerçek GT 1e4; yaklaşık çapa için orta değer).")
     ap.add_argument("--loop-db-stride", type=int, default=10)
     ap.add_argument("--loop-query-stride", type=int, default=10)
+    # Yoğun harita-tabanlı mutlak konumlandırma (AVL/DSMAC; --loop'un güçlü genellemesi)
+    ap.add_argument("--map", action="store_true",
+                    help="Yoğun harita konumlandırma: her sağlıksız kareyi GT'li harita karelerine konumlandır.")
+    ap.add_argument("--map-db-stride", type=int, default=6)
+    ap.add_argument("--map-query-stride", type=int, default=3)
+    ap.add_argument("--map-min-inliers", type=int, default=40)
+    ap.add_argument("--map-weight", type=float, default=50.0)
+    ap.add_argument("--map-radius", type=float, default=120.0,
+                    help="Uzamsal kapılama yarıçapı (m); 0 = tüm haritaya eşle.")
     args = ap.parse_args()
 
     if args.max_features is not None:
@@ -212,6 +221,67 @@ def main():
         print(f"      Medyan={np.median(err2[un]):.3f}  Maks={err2[un].max():.3f} m")
         print("=" * 60)
         pred, err, E = pred2, err2, E2          # grafikler loop-düzeltilmiş sonucu göstersin
+
+    # ---- Yoğun harita-tabanlı mutlak konumlandırma (AVL/DSMAC) ----
+    if args.map:
+        from vo.loop_closure import LoopCloser, LoopAnchor
+        from vo.map_localize import MapLocalizer, build_map, localize_all
+        from vo.batch import build_raw_chain
+        mp_cache = os.path.join(
+            config.OUTPUTS_DIR,
+            f"_cache_map_{args.modality}_step{args.step}_{args.health_mode}"
+            f"{('_d'+str(args.dropout)) if args.health_mode=='intermittent' else ''}"
+            f"_db{args.map_db_stride}_q{args.map_query_stride}_mi{args.map_min_inliers}.npz")
+        tmp = time.perf_counter()
+        if args.cache and os.path.exists(mp_cache):
+            ma = np.load(mp_cache)
+            a_idx, a_xyz, a_ninl = ma["idx"], ma["xyz"], ma["ninl"]
+            print(f"\nHarita konumlandırma: çapalar ÖNBELLEKTEN ({len(a_idx)} kare).")
+        else:
+            print("\nHarita konumlandırma: harita+sorgu çıkarılıyor (DISK+LightGlue)...")
+            chain = build_raw_chain(batch.fms)
+            theta = float(diag["sim2d"].theta); s = float(diag["sim2d"].s)
+            closer = LoopCloser(proc_max_width=args.proc_width)
+            src3 = VideoFrameSource(video, step=args.step, max_width=None, to_gray=False)
+
+            def mp_iter():
+                j = 0
+                for oi, fr in src3:
+                    if j >= n:
+                        break
+                    yield j, fr
+                    j += 1
+
+            map_kfs, queries = build_map(closer, mp_iter(), healths, gts, chain["phi"],
+                                         theta, db_stride=args.map_db_stride,
+                                         query_stride=args.map_query_stride)
+            loc = MapLocalizer(closer, mpp0=max(s, 1.0) / 1000.0,
+                               min_inliers=args.map_min_inliers)
+            resid = loc.calibrate(map_kfs)
+            print(f"  harita={len(map_kfs)} kare, sorgu={len(queries)}; "
+                  f"kalibrasyon: flip={loc.flip.tolist()} mpp={loc.mpp:.4f} artık={resid}")
+            anchors0 = localize_all(loc, map_kfs, queries, pred_prior=pred,
+                                    radius=args.map_radius)
+            a_idx = np.array([a.idx for a in anchors0], dtype=int)
+            a_xyz = np.array([a.xyz for a in anchors0], dtype=float).reshape(-1, 3)
+            a_ninl = np.array([a.n_inlier for a in anchors0], dtype=int)
+            print(f"  konumlanan kare={len(a_idx)} ({time.perf_counter()-tmp:.0f}s)")
+            if args.cache:
+                os.makedirs(config.OUTPUTS_DIR, exist_ok=True)
+                np.savez(mp_cache, idx=a_idx, xyz=a_xyz, ninl=a_ninl)
+
+        anchors = [LoopAnchor(int(i), x, args.map_weight, int(ni))
+                   for i, x, ni in zip(a_idx, a_xyz, a_ninl)]
+        predm = smooth_trajectory(batch, w_anchor=args.w_anchor, align_mode=args.align_mode,
+                                  loop_anchors=anchors)
+        errm = np.linalg.norm(predm - gts, axis=1)
+        Em = float(errm[un].mean())
+        if len(a_idx):
+            print(f"  Konumlanan karelerde E: {err[a_idx].mean():.1f}m -> {errm[a_idx].mean():.1f}m")
+        print(f"  >>> RESMİ METRİK (harita konumlandırma): E = {Em:.3f} m  (öncesi: {E:.3f} m)")
+        print(f"      Medyan={np.median(errm[un]):.3f}  Maks={errm[un].max():.3f} m")
+        print("=" * 60)
+        pred, err, E = predm, errm, Em
 
     os.makedirs(config.OUTPUTS_DIR, exist_ok=True)
     base = os.path.join(config.OUTPUTS_DIR, f"evalB_{args.modality}_{args.tag}_{args.health_mode}_step{args.step}")

@@ -111,10 +111,13 @@ def build_raw_chain(fms: list) -> dict:
       raw    : (N,3) kümülatif ham pozisyon (inc'in kümülatif toplamı)
       raw_dz : (N,) per-frame ham dz (irtifa proxy'si; z hizalama için)
       ok     : (N,) bool — kare güvenilir mi
+      phi    : (N,) kümülatif ham heading (her karenin gövde→ham yön açısı; harita
+               konumlandırmada anahtar-kare yönü için: dünya-heading = θ_align + phi[i])
     """
     n = len(fms)
     inc = np.zeros((n, 3))
     ok = np.zeros(n, dtype=bool)
+    phi_arr = np.zeros(n)
     phi = 0.0
     last_inc = np.zeros(3)
     last_dyaw = 0.0
@@ -127,8 +130,9 @@ def build_raw_chain(fms: list) -> dict:
             ok[i] = True
         else:
             body, dyaw = last_inc, last_dyaw      # sabit-hız yedeği
+        phi_arr[i] = phi                          # i. karenin yönü (bu adımın dyaw'ı eklenmeden)
         c, s = np.cos(phi), np.sin(phi)
         inc[i] = [c * body[0] - s * body[1], s * body[0] + c * body[1], body[2]]
         phi += dyaw
     raw = np.cumsum(inc, axis=0)
-    return {"inc": inc, "raw": raw, "raw_dz": inc[:, 2], "ok": ok}
+    return {"inc": inc, "raw": raw, "raw_dz": inc[:, 2], "ok": ok, "phi": phi_arr}

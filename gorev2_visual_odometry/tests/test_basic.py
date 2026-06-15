@@ -177,10 +177,33 @@ def test_loop_anchor():
     print("test_loop_anchor PASS")
 
 
+def test_map_localize_geometry():
+    """Harita konumlandırma geometrisi (torch'suz): homografi ofseti → doğru mutlak konum."""
+    from vo.map_localize import MapLocalizer, MapKF
+    from vo.loop_closure import _KF
+    loc = MapLocalizer(closer=None, mpp0=1.0)   # __init__ yalnızca closer'ı saklar
+    loc.mpp = 2.0
+    loc.flip = np.array([1.0, -1.0])
+    hw = (480, 640)
+    m = MapKF(kf=_KF(5, None, None, hw, np.array([10.0, 20.0, 5.0])), heading=0.0)
+    q = _KF(50, None, None, hw, None)
+    # H: query merkezi keyframe merkezine göre (12,-7) piksel kayıyor
+    H = np.array([[1, 0, 12.0], [0, 1, -7.0], [0, 0, 1.0]])
+    g = loc._predict_from(q, m, H)
+    # flip*d_px=[12,7]; off=2*R(0)*[12,7]=[24,14]; G=[10+24,20+14]
+    assert abs(g[0] - 34.0) < 1e-6 and abs(g[1] - 34.0) < 1e-6, g
+    # Heading=90°: R(pi/2)*[12,7]=[-7,12]; off=2*[-7,12]=[-14,24]; G=[10-14,20+24]
+    m2 = MapKF(kf=_KF(5, None, None, hw, np.array([10.0, 20.0, 5.0])), heading=np.pi / 2)
+    g2 = loc._predict_from(q, m2, H)
+    assert abs(g2[0] - (-4.0)) < 1e-5 and abs(g2[1] - 44.0) < 1e-5, g2
+    print("test_map_localize_geometry PASS")
+
+
 def run_all():
     tests = [test_calibration_parse, test_umeyama_3d, test_umeyama_2d,
              test_motion_translation, test_pipeline_smoke,
-             test_linear_smoother, test_batch_smooth, test_loop_anchor]
+             test_linear_smoother, test_batch_smooth, test_loop_anchor,
+             test_map_localize_geometry]
     failed = 0
     for t in tests:
         try:
