@@ -74,6 +74,8 @@ def main():
     ap.add_argument("--kare", type=int, default=8)
     ap.add_argument("--baslangic", type=int, default=900)
     ap.add_argument("--no-sahi", action="store_true")
+    ap.add_argument("--arch", default=None, choices=[None, "yolo", "rtdetr"],
+                    help="Tespit mimarisi: yolo (YOLOv11+SAHI) | rtdetr (SOTA DETR).")
     args = ap.parse_args()
 
     os.makedirs(C.OUTPUTS_DIR, exist_ok=True)
@@ -82,8 +84,9 @@ def main():
         print("HATA: kare bulunamadı (ne MP4 ne örnek JPG).")
         return
 
-    print(f"Model: {C.YOLO_MODEL} | SAHI: {not args.no_sahi} | cihaz: {C.DEVICE}")
-    model = Gorev1Modeli(model_classes="coco", use_sahi=not args.no_sahi)
+    arch = args.arch or C.DETECTOR_ARCH
+    print(f"Mimari: {arch} | SAHI: {not args.no_sahi and arch != 'rtdetr'} | cihaz: {C.DEVICE}")
+    model = Gorev1Modeli(model_classes="coco", use_sahi=not args.no_sahi, arch=arch)
 
     toplam = 0
     for oi, fr in kareler:

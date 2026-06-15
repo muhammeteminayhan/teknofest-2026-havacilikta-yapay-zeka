@@ -47,10 +47,13 @@ class Gorev1Modeli:
     """
 
     def __init__(self, model_path: Optional[str] = None, model_classes: str = "coco",
-                 use_sahi: Optional[bool] = None):
+                 use_sahi: Optional[bool] = None, arch: Optional[str] = None):
         self.model_classes = model_classes
+        arch = arch or C.DETECTOR_ARCH
+        if model_path is None:
+            model_path = C.RTDETR_MODEL if arch == "rtdetr" else C.YOLO_MODEL
         self.detector = Detector(
-            model_path=model_path or C.YOLO_MODEL,
+            model_path=model_path, arch=arch,
             use_sahi=C.USE_SAHI if use_sahi is None else use_sahi,
             device=C.DEVICE, conf=C.CONF_THRESH, iou=C.IOU_THRESH, half=C.HALF,
             slice_size=C.SAHI_SLICE, overlap=C.SAHI_OVERLAP,

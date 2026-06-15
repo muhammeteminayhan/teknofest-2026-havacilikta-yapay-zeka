@@ -27,9 +27,15 @@ ORNEK_TERMAL_VIDEO = os.path.join(ORNEK_VERI_DIR, "THYZ_2026_Ornek_Veri_2_Termal
 # --------------------------------------------------------------------------
 # Model
 # --------------------------------------------------------------------------
-# Baseline: COCO-pretrained YOLOv11 (sanity). Fine-tune sonrası kendi ağırlığımız.
+# Mimari: "yolo" (YOLOv11 + SAHI; pratik, kolay) | "rtdetr" (RT-DETR; SOTA DETR,
+# global bağlam, küçük nesnede güçlü; ultralytics içinde, ek kurulum yok).
+# Not: en yüksek AP için DEIM-D-FINE (CVPR'25) ayrı repo ister (çevrimdışı indir);
+# RT-DETR pratikte kurulabilir SOTA seçenektir.
+DETECTOR_ARCH = "yolo"                      # "yolo" | "rtdetr"
+# Baseline: COCO-pretrained (sanity). Fine-tune sonrası kendi ağırlığımız.
 # 8GB VRAM: 'n'/'s' güvenli; 'm' fp16 ile sığar. Blackwell (sm_120) → torch cu128.
 YOLO_MODEL = "yolo11n.pt"                  # baseline pretrained (ultralytics indirir)
+RTDETR_MODEL = "rtdetr-l.pt"               # RT-DETR baseline (ultralytics indirir)
 YOLO_FINETUNED = os.path.join(WEIGHTS_DIR, "g1_finetuned.pt")  # eğitim çıktısı (sonra)
 DEVICE = "cuda:0"                          # yoksa otomatik cpu'ya düşülür (yolo_sahi.py)
 HALF = True                                # fp16 çıkarım (hız + VRAM)

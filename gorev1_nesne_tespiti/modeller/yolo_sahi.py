@@ -47,8 +47,13 @@ class Detector:
 
     def __init__(self, model_path: str, use_sahi: bool = True,
                  device: Optional[str] = None, conf: float = 0.25, iou: float = 0.7,
-                 half: bool = True, slice_size: int = 640, overlap: float = 0.25):
+                 half: bool = True, slice_size: int = 640, overlap: float = 0.25,
+                 arch: str = "yolo"):
         self.model_path = model_path
+        self.arch = arch                       # "yolo" | "rtdetr" (SOTA DETR; ultralytics)
+        # RT-DETR global-bağlamlı; SAHI (YOLO sarıcı) ile uyumsuz → doğrudan çıkarım.
+        if arch == "rtdetr":
+            use_sahi = False
         self.use_sahi = use_sahi
         self.conf = conf
         self.iou = iou
@@ -84,6 +89,9 @@ class Detector:
                     model_type="yolov8", model_path=self.model_path,
                     confidence_threshold=self.conf, device=self.device,
                 )
+        elif self.arch == "rtdetr":
+            from ultralytics import RTDETR
+            self._yolo = RTDETR(self.model_path)   # .predict arayüzü YOLO ile aynı
         else:
             from ultralytics import YOLO
             self._yolo = YOLO(self.model_path)
