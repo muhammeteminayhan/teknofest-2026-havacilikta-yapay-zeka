@@ -44,13 +44,22 @@ arasındaki **ortalama Öklid hatası** (`E`, düşük = iyi) ile yapılır.
 | Aralıklı, 200 kare (~27 s) | ~38 m | **8.7 m** | 4.3 m |
 | Aralıklı, 300 kare (~40 s) | ~50 m | **22 m** | 10.5 m |
 | Aralıklı, 450 kare (~60 s) | — | **47 m** | 29.5 m |
-| Worst-case (1806 kare KESİNTİSİZ, çapasız kuyruk) | ~179 m | ~179 m | 136 m |
+| Worst-case (1806 kare KESİNTİSİZ, çapasız kuyruk) | ~179 m | **129 m** (loop closure) | 69 m |
 
 - Batch, çapalanmış (bracketed) segmentlerde **5–50× iyileşme** sağlar; hata GPS
   kesinti süresine bağlıdır. Z ekseni her durumda ~1–3 m.
-- **Çapasız kuyruk** (oturum sağlıksız biterse, prefix sonrası hiç çapa yok) batch
-  ile düzelmez; bu, monoküler VO'nun temel drift sınırıdır → öğrenilen özellikler /
-  döngü kapama (sonraki faz) gerekir.
+- **Çapasız kuyruk** (oturum sağlıksız biterse): **loop closure** ile 179m → **129m**
+  (`--loop`). Yörünge GT-çapalı prefix bölgesini yeniden ziyaret ettiğinden (kuyruğun
+  ~%20'si <50m), görsel revisit eşleme (DISK+LightGlue) o kareye sanal mutlak çapa verir;
+  doğrudan eşleşen kareler **257m → 29m**. Daha çok loop (yoğun sorgu) = daha fazla kazanç.
+
+### Doğrulanmış SOTA bulguları (ampirik A/B)
+- **Öğrenilen ön-yüz (DISK+LightGlue)** sıralı VO drift'ini **anlamlı düşürmedi** (KLT
+  ile ~aynı: tail 177.8 vs 179.8m). Darboğaz piksel değil, sistematik ölçek+heading drift.
+  Yine de loop closure'ın geniş-bazlı eşleme çekirdeği bu öğrenilen eşleştirmeyi kullanır.
+- **Loop closure = asıl SOTA kaldıracı** (çapasız kuyruğu kıran tek yöntem).
+- Metrik derinlik (Depth Anything V2 / Metric3D): literatür yüksek-irtifada güvenilmez
+  diyor → ertelendi; doğrulanmadan ana ölçek yapılmamalı.
 
 ## Kurulum
 
@@ -70,7 +79,9 @@ python scripts/extract_frames.py --modality rgb
 # BATCH değerlendirme (ÖNERİLEN) — global optimizasyon, resmi metrik + grafikler
 python scripts/evaluate_batch.py --modality rgb --step 4 --health-mode intermittent --dropout 300 --cache
 python scripts/evaluate_batch.py --modality rgb --step 4 --health-mode tail --cache
-#   --cache: pass-1'i (yavaş) önbelleğe alır; optimizer parametrelerini hızlı dener
+#   --loop: çapasız kuyrukta loop closure (DISK+LightGlue revisit eşleme; 179m→129m)
+python scripts/evaluate_batch.py --modality rgb --step 4 --health-mode tail --cache --loop
+#   --backend disk|klt: öğrenilen vs klasik ön-yüz (A/B). --cache: pass-1 önbelleği
 #   --align-mode interp|global, --stage2, --w-anchor, --dropout/--recover
 
 # Çevrimiçi değerlendirme (yedek mod)
