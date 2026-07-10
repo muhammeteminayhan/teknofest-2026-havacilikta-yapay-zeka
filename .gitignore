@@ -34,3 +34,6 @@ Thumbs.db
 
 # Toplu test ciktilari
 sistem/test_ciktilari/
+
+# Gercek sunucu toplama ciktilari
+sistem/sunucu_ciktilari/
