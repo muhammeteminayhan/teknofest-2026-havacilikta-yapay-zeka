@@ -1,0 +1,43 @@
+# Havacilikta YZ 2026 - uc gorev ortami (Python 3.13, .venv)
+# Kurulum:  python -m venv .venv  ->  .venv\Scripts\python -m pip install -r requirements.txt
+# Surumler test edilen calisan ortama sabitlenmistir; sorun yasarsan == kaldirip
+# guncel surumu deneyebilirsin.
+
+# --- Cekirdek (main.py + 3 gorevin ortak bagimliliklari) ---
+numpy==2.4.6
+opencv-python==5.0.0.93
+scipy==1.18.0
+pandas==3.0.3
+matplotlib==3.11.0
+tqdm==4.68.3
+PyYAML==6.0.3
+
+# --- sistem/ (canli baglanti arayuzu) ---
+requests==2.34.2
+python-decouple==3.8
+
+# --- Gorev 1 (nesne tespiti) ---
+# Vanilla YOLOv8s -> STANDART ultralytics (ozel fork GEREKMEZ). pillow vb.
+# alt bagimliliklari ultralytics kendisi getirir.
+ultralytics==8.4.92
+
+# --- Gorev 3 (goruntu esleme) ---
+# DINOv3 omurgasi HuggingFace transformers ile yuklenir.
+transformers==5.13.0
+
+# --- Gorev 2 tema testleri (opsiyonel) ---
+# Mid-Air HDF5 sensor dosyalarini okumak icin (07_tema_dayanikliligi.ipynb).
+h5py==3.16.0
+
+# --- Notebook / gelistirme (opsiyonel; sadece gorev2/notebooks icin) ---
+jupyter
+nbformat
+ipykernel
+
+# --- GPU (RAFT optik akis + DINOv3) ---
+# torch/torchvision duz PyPI'dan DEGIL, CUDA index'inden kurulur:
+#   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# (RTX 5060 = Blackwell mimarisi, cu128+ gerektirir. Test edilen: torch 2.11.0+cu128,
+#  torchvision 0.26.0+cu128)
+
+# NOT: rembg / ozel ultralytics-fork ARTIK GEREKMEZ (eski cozumden kaldirildi).

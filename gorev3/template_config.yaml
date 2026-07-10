@@ -1,0 +1,49 @@
+# config.yaml
+
+# ── Model & Backbone Settings ──
+model:
+  yolo_weights: "yolov8-dinov3.yaml"
+  dino_size: "small"              # Options: "small", "base", "large", "giant"
+  patch_size: 14                  # DINOv2 patch size (usually fixed at 14)
+
+# ── Ultralytics Predict Settings (YOLO Detection) ──
+yolo_predict:
+  conf: 0.25                      # Object confidence threshold for detection
+  iou: 0.7                        # Intersection over Union (IoU) threshold for NMS
+  imgsz: 640                      # Image size for inference (scalar or list)
+  half: false                     # Use half precision (FP16)
+  device: ""                      # Device to run on (e.g. 'cuda:0', 'cpu', or '' for auto)
+  max_det: 300                    # Maximum number of detections per image
+  classes: null                   # Filter by class (list of class indices)
+  agnostic_nms: false             # Class-agnostic NMS
+  save: false                     # Save predicted images/videos
+  show: false                     # Show predicted images/videos
+  verbose: false                  # Print verbose output during prediction
+
+# ── Feature Pyramid Network (FPN) Settings ──
+fpn:
+  levels:                         # Scales at which patches are extracted (must be multiples of patch_size)
+    P3: 224                       # Fine details
+    P4: 168                       # Medium details
+    P5: 112                       # Coarse details
+  fusion_method: "max"            # Options: "max", "mean", "weighted"
+  fusion_weights: [0.5, 0.3, 0.2] # Only used if fusion_method is "weighted"
+  upsample_order: 1               # Interpolation order (1 = bilinear)
+
+# ── Template Reference Registration ──
+reference:
+  augment: false                  # Enable horizontal/vertical flips and scale jittering
+  augment_scales: [0.9, 1.1]      # Scale multipliers for jittering
+
+# ── Detection & BBox Extraction (Template Matcher) ──
+matching:
+  cls_threshold: 0.3              # Threshold for early rejection (if _cls_filter is ever re-enabled)
+  min_confidence: 0.25            # Minimum absolute similarity to trigger a valid detection
+  threshold_ratio: 0.60           # Slices the heatmap at 60% of the peak to define the box
+  noise_floor: 0.15               # Absolute minimum threshold floor
+  
+  morphology:
+    kernel_shape: "ellipse"       # Options: "ellipse", "rect", "cross"
+    kernel_size: 9                # Kernel size for Morphological closing
+
+  nms_iou_threshold: 0.5          # Non-Maximum Suppression overlap threshold

@@ -1,0 +1,30 @@
+# --- Sanal ortam (5+ GB, yeniden kurulur) ---
+.venv/
+venv/
+
+# --- Arsiv (eski model/fork/zip — teslime dahil degil) ---
+eski-dosyalar/
+
+# --- Buyuk videolar (GitHub 100 MB/dosya sinirini asar) ---
+*.MP4
+*.mp4
+*.avi
+*.mov
+
+# --- Calisma onbellegi (otomatik yeniden olusur) ---
+sistem/_logs/
+sistem/_images/
+**/_logs/
+**/_images/
+
+# --- Python derleme artiklari ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# --- Isletim sistemi / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
