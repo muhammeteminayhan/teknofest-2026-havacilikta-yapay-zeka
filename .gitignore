@@ -31,3 +31,6 @@ Thumbs.db
 
 # Proje zip yedekleri
 *.zip
+
+# Toplu test ciktilari
+sistem/test_ciktilari/
