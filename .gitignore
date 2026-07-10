@@ -28,3 +28,6 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Proje zip yedekleri
+*.zip

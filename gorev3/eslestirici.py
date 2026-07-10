@@ -41,7 +41,8 @@ def _sessiz():
 
 
 class Gorev3Matcher:
-    def __init__(self, kind: str = "dinov3", backbone=None, config_path: Optional[str] = None):
+    def __init__(self, kind: str = "dinov3", backbone=None, config_path: Optional[str] = None,
+                 remove_bg: bool = True):
         with open(config_path or _CONFIG, "r", encoding="utf-8") as fh:
             cfg = yaml.safe_load(fh)
         if backbone is None:
@@ -49,12 +50,32 @@ class Gorev3Matcher:
         with _sessiz():
             self.matcher = TemplateMatcher(backbone, cfg)
         self.n_ref = 0
-        logging.info(f"Gorev3Matcher hazir: omurga={kind}")
+        # Referans arka planini rembg ile temizle (nesneyi izole eder -> temiz CLS
+        # token -> daha iyi esleme). Kapatmak icin remove_bg=False.
+        self.remove_bg = remove_bg
+        logging.info(f"Gorev3Matcher hazir: omurga={kind}, arka_plan_temizle={remove_bg}")
+
+    @staticmethod
+    def _arka_plan_temizle(rgb: np.ndarray) -> np.ndarray:
+        """Referans gorselinin arka planini rembg (u2net) ile sil. Basarisiz olursa
+        (rembg yok / u2net inememis) orijinali dondur — sistem cokmez."""
+        try:
+            from rembg import remove
+            out = remove(rgb)                       # RGBA (arka plan seffaf/siyah)
+            if out.ndim == 3 and out.shape[2] == 4:
+                out = cv2.cvtColor(out, cv2.COLOR_RGBA2RGB)
+            return out
+        except Exception as e:
+            logging.warning(f"Gorev3: arka plan temizleme atlandi (rembg/u2net): {e}")
+            return rgb
 
     # ── Referans kaydı ──────────────────────────────────────────────────────
     def register_reference(self, image_bgr: np.ndarray, object_id: int) -> None:
-        """Tek bir referans nesneyi kaydet (BGR girer, RGB'ye çevrilir)."""
+        """Tek bir referans nesneyi kaydet (BGR girer, RGB'ye çevrilir; istenirse
+        arka planı rembg ile temizlenir)."""
         rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        if self.remove_bg:
+            rgb = self._arka_plan_temizle(rgb)
         with _sessiz():
             self.matcher.add_reference([rgb], object_id=object_id)
         self.n_ref += 1

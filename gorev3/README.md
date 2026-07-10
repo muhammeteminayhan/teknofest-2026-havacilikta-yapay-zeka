@@ -20,6 +20,18 @@ yapılıp birleştirilir (max füzyon).
 - **Yedek omurga "dinov2"** (torch.hub `dinov2_vits14_reg`, patch14, kapılı değil):
   `Gorev3Matcher(kind="dinov2")` ile tek satırda geçilir. DINOv3 önbelleği yoksa güvenli liman.
 
+### Referans arka plan temizleme (rembg)
+Referans görselinin arka planı **rembg (u2net)** ile silinir (`remove_bg=True`, varsayılan açık) —
+amaç nesneyi izole edip CLS token'ı arka plandan arındırmak. Arkadaşın (Görev 3'ü yapan) orijinal
+mantığı budur; `_arka_plan_temizle` içinde birebir korunur (`remove(rgb)` → RGBA→RGB), rembg/u2net
+başarısızsa sessizce orijinali kullanır (çökme yok).
+- **Çevrimdışı:** rembg `onnxruntime` ister ve u2net modelini (~170 MB) `~/.u2net/`'e indirir →
+  yarışma öncesi önbelleklenmeli.
+- **⚠️ Ölçülen uyarı:** örnek referanslarla (yer-seviyesi yakın-çekim) arka plan temizleme eşleşme
+  güvenini **düşürdü** (temizsiz ~0,3 → temizli eşik altı, 0 eşleşme). Sebep: rembg nesneyi *siyah*
+  zemine oturtuyor, sahne kareleri doğal → benzerlik düşüyor. Gerçek yarışma referansları farklıysa
+  yardımı olabilir. **Kapatmak için:** `Gorev3Matcher(remove_bg=False)`.
+
 ## Dosyalar
 ```
 gorev3/

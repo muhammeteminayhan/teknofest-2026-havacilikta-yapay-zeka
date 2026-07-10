@@ -24,6 +24,10 @@ ultralytics==8.4.92
 # --- Gorev 3 (goruntu esleme) ---
 # DINOv3 omurgasi HuggingFace transformers ile yuklenir.
 transformers==5.13.0
+# Referans arka plan temizleme (rembg -> u2net). rembg onnxruntime backend'i ister.
+# u2net modeli ilk kullanimda ~/.u2net/'e iner (yarisma icin onden onbelleklenmeli).
+rembg==2.0.76
+onnxruntime==1.27.0
 
 # --- Gorev 2 tema testleri (opsiyonel) ---
 # Mid-Air HDF5 sensor dosyalarini okumak icin (07_tema_dayanikliligi.ipynb).
@@ -40,4 +44,4 @@ ipykernel
 # (RTX 5060 = Blackwell mimarisi, cu128+ gerektirir. Test edilen: torch 2.11.0+cu128,
 #  torchvision 0.26.0+cu128)
 
-# NOT: rembg / ozel ultralytics-fork ARTIK GEREKMEZ (eski cozumden kaldirildi).
+# NOT: ozel ultralytics-fork ARTIK GEREKMEZ (eski cozumden kaldirildi; Gorev 1 vanilla).

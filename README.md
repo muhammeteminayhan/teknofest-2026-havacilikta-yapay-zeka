@@ -115,7 +115,8 @@ Test 1 geçtiyse: `.env.online` ile `python main.py`. `_logs/` içinde 201'leri 
 # ✅ Yarışma Günü Kontrol Listesi
 
 - [ ] **Çevrimdışı hazır mı?** Test 5'i çalıştır. Gerekli önbellekler: DINOv3
-      (`~/.cache/huggingface`), RAFT ağırlığı (torchvision cache). Görev 1 internet istemez.
+      (`~/.cache/huggingface`), RAFT ağırlığı (torchvision cache), **u2net** (`~/.u2net/u2net.onnx`,
+      Görev 3 referans arka plan temizleme). Görev 1 internet istemez.
 - [ ] **`sistem/main.py` başlarken "On kontrol"** satırında `cuda: True`, `raft_agirliklari_yerel: True`
       görünmeli (GPU + RAFT hazır).
 - [ ] **Doğru `.env`** (`.env.online`) kopyalandı mı?
