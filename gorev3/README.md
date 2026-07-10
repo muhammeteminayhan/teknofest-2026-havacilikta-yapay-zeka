@@ -16,7 +16,9 @@ yapılıp birleştirilir (max füzyon).
   Bu model **kapılı (gated)** — bir kez erişim onayı + token ile indirilip önbelleğe
   alınır, **sonrasında token gerekmeden çevrimdışı çalışır** (`~/.cache/huggingface`).
 - `dino_backbone.py` fork'un ağır projeksiyon katmanlarını (P3/P4/P5) **atlar** — eşleme
-  için yalnızca ham `last_cls_token` / `last_patch_tokens` / `mask_dim` gerekir.
+  için yalnızca ham `last_cls_token` / `last_patch_tokens` / `mask_dim` gerekir. Token çıkarımı
+  (ImageNet normalize, girişi **112**'ye padle, `1+register` özel token atla, `mask_dim=H//16`)
+  arkadaşın `dinov3.py`'siyle **sayısal olarak birebir** — sadece fork bağımlılığı yok.
 - **Yedek omurga "dinov2"** (torch.hub `dinov2_vits14_reg`, patch14, kapılı değil):
   `Gorev3Matcher(kind="dinov2")` ile tek satırda geçilir. DINOv3 önbelleği yoksa güvenli liman.
 

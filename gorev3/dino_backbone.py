@@ -43,8 +43,12 @@ class _DinoV3Backbone(nn.Module):
 
     def forward(self, x):
         B, C, H, W = x.shape
-        ph = (self.patch_size - H % self.patch_size) % self.patch_size
-        pw = (self.patch_size - W % self.patch_size) % self.patch_size
+        # Arkadasin dinov3.py'siyle BIREBIR: girisi 112'ye (14 ve 16'nin EKOK'u)
+        # padle. Boylece token cikarimi ve mask_dim fork'unkiyle sayisal olarak ayni.
+        # (112, 16'nin kati oldugundan mask_dim = H//16 yine tam boluner.)
+        PAD = 112
+        ph = (PAD - H % PAD) % PAD
+        pw = (PAD - W % PAD) % PAD
         if ph or pw:
             x = F.pad(x, (0, pw, 0, ph))
             _, _, H, W = x.shape
