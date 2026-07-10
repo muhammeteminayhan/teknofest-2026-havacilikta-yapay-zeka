@@ -3,6 +3,9 @@ import time
 from collections import deque
 from datetime import datetime
 from pathlib import Path
+import cv2
+import numpy as np
+import requests
 from decouple import config
 from tqdm import tqdm
 from src.connection_handler import ConnectionHandler
@@ -68,6 +71,20 @@ def run():
 
     # Klasorun ve dosyanin yollarini cekelim
     images_files, images_folder = server.get_listdir()
+
+    # Gorev 3 referans nesnelerini kaydet (varsa). Sunucu, frames-JSON'daki
+    # `references` anahtarinda referans objeleri veriyor (test oturumunda bos).
+    # Referans gorseli /media gibi auth token ister. references bossa NO-OP:
+    # Gorev 2 akisi aynen korunur.
+    referanslar = frames_json[0].get("references", []) if frames_json else []
+    if referanslar:
+        def _ref_indir(url):
+            tam = url if str(url).startswith("http") else evaluation_server_url + "media" + url
+            r = requests.get(tam, headers={"Authorization": f"Token {server.auth_token}"}, timeout=60)
+            return cv2.imdecode(np.frombuffer(r.content, np.uint8), cv2.IMREAD_COLOR)
+        n_ref = detection_model.register_references(referanslar, download=_ref_indir)
+        logging.info(f"Gorev 3: {n_ref} referans kaydedildi (sunucudan).")
+        print(f"Gorev 3: {n_ref} referans kaydedildi.")
 
     # 80 tahmin/dk sunucu limiti icin tempo denetleyici
     limiter = RateLimiter(max_per_minute=80)
