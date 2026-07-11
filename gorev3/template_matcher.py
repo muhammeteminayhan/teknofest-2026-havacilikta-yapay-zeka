@@ -302,6 +302,42 @@ class TemplateMatcher:
         union = a.width * a.height + b.width * b.height - inter
         return inter / union if union > 0 else 0.0
 
+    # ── Tiling (SAHI: buyuk goruntude minik nesne) ─────────────────────────────
+
+    def _tile_positions(self, H: int, W: int, tile: int, overlap: float):
+        """Ortusen karolarin sol-ust koseleri (kenarlar dahil)."""
+        stride = max(1, int(round(tile * (1.0 - overlap))))
+        def eksen(L):
+            if L <= tile:
+                return [0]
+            ps = list(range(0, L - tile + 1, stride))
+            if ps[-1] != L - tile:
+                ps.append(L - tile)
+            return ps
+        xs, ys = eksen(W), eksen(H)
+        return [(x, y) for y in ys for x in xs]
+
+    def _tiled_heatmap(self, frame: np.ndarray, ref: "ReferenceObject") -> np.ndarray:
+        """SAHI-style: sahneyi ortusen karolara bol, her karoda benzerlik haritasi
+        cikar, tam-kare tuvaline MAX ile birlestir. Minik nesne bir karoda yuksek
+        cozunurlukte buyur ve tepe olusturur (ölcek sorununu asar)."""
+        H, W = frame.shape[:2]
+        tcfg = self.config.get('tiling', {})
+        tile = min(int(tcfg.get('tile_size', 640)), H, W)
+        overlap = float(tcfg.get('overlap', 0.2))
+        full = np.zeros((H, W), dtype=np.float32)
+        for (x, y) in self._tile_positions(H, W, tile, overlap):
+            crop = frame[y:y + tile, x:x + tile]
+            ch, cw = crop.shape[:2]
+            feats = {}
+            for name, size in self.FPN_LEVELS:
+                _, p, gh, gw = self._extract(crop, size)
+                feats[name] = (p, gh, gw)
+            th = self._fpn_heatmap(ch, cw, ref, feats)          # (ch, cw)
+            sub = full[y:y + ch, x:x + cw]
+            full[y:y + ch, x:x + cw] = np.maximum(sub, th)
+        return full
+
     # ── Main Inference ────────────────────────────────────────────────────────
 
     def match(
@@ -318,9 +354,10 @@ class TemplateMatcher:
             raise ValueError("No references registered. Call add_reference() first.")
 
         H_orig, W_orig = frame.shape[:2]
+        tiled = bool(self.config.get('tiling', {}).get('enabled', False))
 
-        # Kare ozniteliklerini olcek basina BIR KEZ cikar (referanstan bagimsiz).
-        # Boylece N referans icin 3 (olcek) omurga gecisi yeter — eskiden 3*N idi.
+        # Kare ozniteliklerini olcek basina BIR KEZ cikar (tam-kare gecis; hem tek-
+        # gecis modunda hem tiling modunda buyuk nesne icin kullanilir).
         frame_feats = {}
         for name, size in self.FPN_LEVELS:
             _, frame_patches, gh, gw = self._extract(frame, size)
@@ -333,11 +370,21 @@ class TemplateMatcher:
         all_heatmaps   = {}
 
         for ref in candidates:
-            heatmap = self._fpn_heatmap(H_orig, W_orig, ref, frame_feats)
-            all_heatmaps[ref.object_id] = heatmap
-            det = self._extract_bbox(frame, heatmap, ref.object_id)
-            if det is not None:
-                all_detections.append(det)
+            # TAM-KARE gecis (buyuk nesne). Kendi statistical esigiyle bbox.
+            whole = self._fpn_heatmap(H_orig, W_orig, ref, frame_feats)
+            dw = self._extract_bbox(frame, whole, ref.object_id)
+            if dw is not None:
+                all_detections.append(dw)
+            hm = whole
+            if tiled:
+                # TILED gecis (minik nesne). AYRI bbox (kendi esigi) -> arka plan
+                # yukselmesi buyuk nesneyi bozmaz. SAHI: dilim + tam-kare tespitleri birlesir.
+                tiled_hm = self._tiled_heatmap(frame, ref)
+                dt = self._extract_bbox(frame, tiled_hm, ref.object_id)
+                if dt is not None:
+                    all_detections.append(dt)
+                hm = np.maximum(whole, tiled_hm)   # yalnizca gorsellestirme icin
+            all_heatmaps[ref.object_id] = hm
 
         final = self._nms(all_detections)
 

@@ -30,6 +30,13 @@ fpn:
   fusion_weights: [0.5, 0.3, 0.2] # Only used if fusion_method is "weighted"
   upsample_order: 1               # Interpolation order (1 = bilinear)
 
+# ── Tiling (SAHI: buyuk goruntude MINIK nesne) ──
+# Sahneyi ortusen karolara bolup her karoda ara -> minik nesne karo icinde buyur.
+tiling:
+  enabled: true                   # false -> eski tek-gecis davranis (buyuk nesneler icin)
+  tile_size: 640                  # karo boyutu (px). 1920x1080 -> ~4x2 karo
+  overlap: 0.2                    # karolar arasi ortusme orani (SAHI onerisi)
+
 # ── Template Reference Registration ──
 reference:
   augment: false                  # Enable horizontal/vertical flips and scale jittering
