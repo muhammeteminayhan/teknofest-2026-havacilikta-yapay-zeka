@@ -43,10 +43,10 @@ class _DinoV3Backbone(nn.Module):
 
     def forward(self, x):
         B, C, H, W = x.shape
-        # Arkadasin dinov3.py'siyle BIREBIR: girisi 112'ye (14 ve 16'nin EKOK'u)
-        # padle. Boylece token cikarimi ve mask_dim fork'unkiyle sayisal olarak ayni.
-        # (112, 16'nin kati oldugundan mask_dim = H//16 yine tam boluner.)
-        PAD = 112
+        # DINOv3-native: girisi patch boyutuna (16) padle. Boylece patch izgarasi
+        # DINOv3'un dogal cozunurlugunde olur (mask_dim = H//16). (Onceki 112 padding
+        # DINOv2/DINOv3 emulasyonu icindi; arkadasin onerisiyle 16'ya cekildi.)
+        PAD = self.patch_size
         ph = (PAD - H % PAD) % PAD
         pw = (PAD - W % PAD) % PAD
         if ph or pw:

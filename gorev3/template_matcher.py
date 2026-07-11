@@ -81,11 +81,13 @@ class TemplateMatcher:
     # ── Module 1: Preprocessing ────────────────────────────────────────────────
 
     def _preprocess(self, image: np.ndarray, size: int) -> torch.Tensor:
-        """Resize image preserving aspect ratio, snap to multiple of 14, normalize."""
+        """Resize preserving aspect ratio, snap to multiple of patch_size, normalize.
+        patch_size omurgadan alinir (DINOv2->14, DINOv3->16) — hardcode yok."""
+        p = int(getattr(self.backbone, "patch_size", 14))
         h, w = image.shape[:2]
         scale = size / max(h, w)
-        new_h = max(14, (int(h * scale) // 14) * 14)
-        new_w = max(14, (int(w * scale) // 14) * 14)
+        new_h = max(p, (int(h * scale) // p) * p)
+        new_w = max(p, (int(w * scale) // p) * p)
         
         # Use INTER_CUBIC for better feature preservation
         resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
@@ -224,12 +226,19 @@ class TemplateMatcher:
         _, max_val, _, max_loc = cv2.minMaxLoc(heatmap)
         cx, cy = max_loc
 
-        # confidence gate
-        if max_val < self.min_confidence:
-            return None
-
-        # absolute threshold — prevents noise amplification
-        raw_threshold = max(max_val * self.threshold_ratio, self.noise_floor)
+        # Esik yontemi: "statistical" (tepe arka plandan anlamli yuksek mi) ya da "ratio" (eski).
+        m = self.config['matching']
+        if m.get('threshold_method', 'ratio') == 'statistical':
+            mu = float(heatmap.mean()); sd = float(heatmap.std()) + 1e-6
+            # Tepe, ortalamadan k_std sigma uzakta DEGILSE gecersiz -> dagilmis (whole-image)
+            # haritada kutu uretilmez. Ayrica mutlak min_confidence kapisi.
+            if max_val < mu + m.get('k_std', 3.0) * sd or max_val < self.min_confidence:
+                return None
+            raw_threshold = mu + m.get('box_k_std', 2.0) * sd
+        else:
+            if max_val < self.min_confidence:
+                return None
+            raw_threshold = max(max_val * self.threshold_ratio, self.noise_floor)
         _, thresh_map = cv2.threshold(heatmap, raw_threshold, 1.0, cv2.THRESH_BINARY)
         thresh_8u = np.uint8(thresh_map * 255)
 
@@ -255,6 +264,11 @@ class TemplateMatcher:
             best = max(contours, key=cv2.contourArea)
 
         x, y, w, h = cv2.boundingRect(best)
+
+        # Whole-image guard: kutu, karenin cogunu kapliyorsa (dagilmis eslesme) reddet.
+        Hh, Ww = heatmap.shape[:2]
+        if (w * h) > m.get('max_box_area_ratio', 1.0) * (Ww * Hh):
+            return None
 
         return Detection(
             object_id=object_id,
