@@ -13,6 +13,8 @@ canlı oturumda çalıştıran sistem:
 Görev 2 bize ait ve tam prova edilmiş; Görev 1 ve 3 arkadaşımızın eğittiği model/koddan
 uyarlandı. Hepsi tek `sistem/` oturumunda birleşik çalışır.
 
+> 🏁 **Yarışma günü:** adım adım çalıştırma için → **[YARISMA_KULLANIM.md](YARISMA_KULLANIM.md)**
+
 ## Klasör yapısı
 ```
 havacilikta-yz-project/
