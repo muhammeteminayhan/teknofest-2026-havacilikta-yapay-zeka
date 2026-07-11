@@ -62,7 +62,6 @@ def main():
 
     gorulen_idler, son_id, tekrar = [], None, 0
     kodlar = {}
-    ref_kaydedildi = False
 
     for k in range(args.max):
         if k > 0:
@@ -83,14 +82,15 @@ def main():
         (CIKTI / f"iter_{k:03d}_frames.json").write_text(json.dumps(frames, ensure_ascii=False, indent=2), encoding="utf-8")
         (CIKTI / f"iter_{k:03d}_translations.json").write_text(json.dumps(translations, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        # Gorev 3 referanslari (varsa, ilk kez)
-        if model is not None and not ref_kaydedildi and fr.get("references"):
+        # Gorev 3 referanslari — HER iterasyonda kontrol et (referanslar farkli
+        # karelerde geliyor: reference_1 frame 165'te, reference_2 frame 525'te...).
+        # register_from_server ayni `order`i tekrar kaydetmez, o yuzden guvenli.
+        if model is not None and fr.get("references"):
             def _ind(u):
                 t = u if str(u).startswith("http") else base + "media" + u
                 rr = requests.get(t, headers={"Authorization": f"Token {server.auth_token}"}, timeout=60)
                 return cv2.imdecode(np.frombuffer(rr.content, np.uint8), cv2.IMREAD_COLOR)
             model.register_references(fr["references"], download=_ind)
-            ref_kaydedildi = True
 
         # gorseli indir + kaydet
         img = None

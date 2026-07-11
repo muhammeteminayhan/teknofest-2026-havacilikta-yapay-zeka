@@ -163,10 +163,17 @@ class ObjectDetectionModel:
 
         # -------------------------------------------------------------------
         # GOREV 3 — GORUNTU ESLEME (referanslar register edildiyse)
+        # Referans yalnizca kendi kare araliginda aranir -> bu karenin frame id'sini
+        # prediction.frame_url'den (".../frames/165/") cikarip match'e veriyoruz.
         # -------------------------------------------------------------------
         if self.gorev3 is not None and image is not None:
             try:
-                for u in self.gorev3.match(image):
+                frame_id = None
+                try:
+                    frame_id = int(str(prediction.frame_url).rstrip("/").split("/")[-1])
+                except (ValueError, AttributeError, TypeError):
+                    pass
+                for u in self.gorev3.match(image, frame_id=frame_id):
                     prediction.add_detected_undefined_object(DetectedUndefinedObject(
                         object_id=u["object_id"],
                         top_left_x=u["top_left_x"], top_left_y=u["top_left_y"],

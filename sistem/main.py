@@ -73,10 +73,13 @@ def run():
     images_files, images_folder = server.get_listdir()
 
     # Gorev 3 referans nesnelerini kaydet (varsa). Sunucu, frames-JSON'daki
-    # `references` anahtarinda referans objeleri veriyor (test oturumunda bos).
-    # Referans gorseli /media gibi auth token ister. references bossa NO-OP:
-    # Gorev 2 akisi aynen korunur.
-    referanslar = frames_json[0].get("references", []) if frames_json else []
+    # `references` anahtarinda referans objeleri veriyor. DIKKAT: referanslar ilk
+    # karede degil, ilgili kare araliginin BASINDA gorunuyor (or. frame 165) — bu
+    # yuzden TUM kareler taranir, sadece frames_json[0] degil. register_from_server
+    # ayni `order`i tekrar kaydetmez. references hic yoksa NO-OP: Gorev 2 korunur.
+    referanslar = []
+    for _fr in (frames_json or []):
+        referanslar.extend(_fr.get("references", []) or [])
     if referanslar:
         def _ref_indir(url):
             tam = url if str(url).startswith("http") else evaluation_server_url + "media" + url

@@ -19,6 +19,7 @@ import contextlib
 import io
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -30,6 +31,16 @@ from .dino_backbone import build_backbone
 from .template_matcher import TemplateMatcher
 
 _CONFIG = Path(__file__).resolve().parent / "template_config.yaml"
+
+
+def _frame_id_cek(url):
+    """'.../frames/165/' -> 165 (int). Bulunamazsa None."""
+    if not url:
+        return None
+    try:
+        return int(str(url).rstrip("/").split("/")[-1])
+    except (ValueError, AttributeError):
+        return None
 
 
 @contextlib.contextmanager
@@ -50,6 +61,11 @@ class Gorev3Matcher:
         with _sessiz():
             self.matcher = TemplateMatcher(backbone, cfg)
         self.n_ref = 0
+        # Referans arama kare araliklari: object_id -> (frame_start_id, frame_end_id).
+        # Referans SADECE bu aralikta aranir (aralik disi yanlis pozitif olmaz).
+        self.ref_araliklar = {}
+        # Ayni referansi (order) iki kez kaydetmeyi onle (idempotent).
+        self.kayitli_orderlar = set()
         # Referans arka planini rembg ile temizle (nesneyi izole eder -> temiz CLS
         # token -> daha iyi esleme). Kapatmak icin remove_bg=False.
         self.remove_bg = remove_bg
@@ -70,57 +86,84 @@ class Gorev3Matcher:
             return rgb
 
     # ── Referans kaydı ──────────────────────────────────────────────────────
-    def register_reference(self, image_bgr: np.ndarray, object_id: int) -> None:
+    def register_reference(self, image_bgr: np.ndarray, object_id: int,
+                           frame_range: Optional[tuple] = None) -> None:
         """Tek bir referans nesneyi kaydet (BGR girer, RGB'ye çevrilir; istenirse
-        arka planı rembg ile temizlenir)."""
+        arka planı rembg ile temizlenir). `frame_range=(start_id, end_id)` verilirse
+        bu referans yalnızca o kare aralığında aranır."""
         rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
         if self.remove_bg:
             rgb = self._arka_plan_temizle(rgb)
         with _sessiz():
             self.matcher.add_reference([rgb], object_id=object_id)
+        if frame_range is not None:
+            self.ref_araliklar[object_id] = frame_range
         self.n_ref += 1
-        logging.info(f"Gorev3: referans {object_id} kaydedildi (toplam {self.n_ref}).")
+        logging.info(f"Gorev3: referans {object_id} kaydedildi (aralik={frame_range}, "
+                     f"toplam {self.n_ref}).")
 
     def register_from_server(self, references: list, download: Optional[Callable] = None) -> int:
-        """Sunucudan gelen frames-JSON `references` listesinden kayıt yap.
+        """Sunucudan gelen frames-JSON `references` girdilerini kaydet.
 
-        Şema kesin bilinmediği için savunmacı okuma: her öğede görsel URL'i
-        (url/image_url/reference_url) ve id (id/object_id) aranır. `download(url)`
-        verilirse görseli indirir (auth gerekebilir); vermezse yerel yol dener.
-        Ham yapı loglanır. Hata olursa Görev 3 pasif kalır (0 döner)."""
+        Gerçek sunucu formatı (gözlemlendi): her referans bir sözlük —
+          `image_url`  : referans görselinin yolu,
+          `order`      : referans kimliği (1, 2, ...),
+          `frame_start`/`frame_end` : referansın aranacağı kare aralığı (URL'lerden id).
+        Aynı `order` ikinci kez gelirse ATLANIR (idempotent — rolling oturumda referans
+        birden çok karede görünebilir). `download(url)` verilirse görseli auth'lu indirir.
+        Hata olursa o referans atlanır (Görev 3 çökmez). Kaydedilen YENİ referans sayısı döner."""
         if not references:
-            logging.info("Gorev3: sunucuda referans yok (references=[]), pasif.")
             return 0
-        logging.info(f"Gorev3: {len(references)} referans geldi, ham ornek: {references[0]}")
         n = 0
         for i, ref in enumerate(references):
             try:
-                if isinstance(ref, dict):
-                    url = ref.get("image_url") or ref.get("url") or ref.get("reference_url")
-                    oid = ref.get("object_id", ref.get("id", i))
-                else:
-                    url, oid = ref, i
-                if download is not None and url:
-                    img = download(url)
-                else:
-                    img = cv2.imread(str(url)) if url else None
-                if img is None:
-                    logging.error(f"Gorev3: referans {i} görseli okunamadı ({url}).")
+                if not isinstance(ref, dict):
                     continue
-                self.register_reference(img, object_id=int(oid))
+                oid = int(ref.get("order", ref.get("object_id", ref.get("id", i))))
+                if oid in self.kayitli_orderlar:
+                    continue  # bu referans zaten kayitli
+                url = ref.get("image_url") or ref.get("url") or ref.get("reference_url")
+                fr = (_frame_id_cek(ref.get("frame_start")), _frame_id_cek(ref.get("frame_end")))
+                img = download(url) if (download and url) else (cv2.imread(str(url)) if url else None)
+                if img is None:
+                    logging.error(f"Gorev3: referans order={oid} görseli okunamadı ({url}).")
+                    continue
+                self.register_reference(img, object_id=oid,
+                                        frame_range=fr if fr[0] is not None else None)
+                self.kayitli_orderlar.add(oid)
                 n += 1
             except Exception as e:
                 logging.error(f"Gorev3: referans {i} kaydı hatası: {e}")
+        if n:
+            logging.info(f"Gorev3: {n} yeni referans kaydedildi (toplam {self.n_ref}).")
         return n
 
     # ── Eşleme ──────────────────────────────────────────────────────────────
-    def match(self, frame_bgr: np.ndarray) -> list[dict]:
-        """Kareyi referanslarla eşle; şema sözlükleri döndür. Referans yoksa []."""
+    def match(self, frame_bgr: np.ndarray, frame_id: Optional[int] = None) -> list[dict]:
+        """Kareyi referanslarla eşle; şema sözlükleri döndür. Referans yoksa [].
+
+        `frame_id` verilirse referanslar SADECE kendi `frame_start..frame_end`
+        aralığında aranır — aralık dışı yanlış pozitifler engellenir. Aralığı
+        bilinmeyen referans her karede aranır (geriye dönük uyum)."""
         if self.n_ref == 0:
             return []
+        tum = self.matcher.references
+        secili = tum
+        if frame_id is not None and self.ref_araliklar:
+            aktif = {oid for oid, (a, b) in self.ref_araliklar.items()
+                     if a is None or b is None or a <= frame_id <= b}
+            # aralığı olmayan referanslar her zaman aktif
+            aralikli = set(self.ref_araliklar)
+            secili = [r for r in tum if r.object_id in aktif or r.object_id not in aralikli]
+        if not secili:
+            return []
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        with _sessiz():
-            dets = self.matcher.match(rgb)
+        self.matcher.references = secili
+        try:
+            with _sessiz():
+                dets = self.matcher.match(rgb)
+        finally:
+            self.matcher.references = tum   # her durumda eski hâle döndür
         out = []
         for d in dets:
             x1, y1, x2, y2 = d.to_xyxy()
