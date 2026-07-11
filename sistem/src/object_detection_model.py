@@ -84,8 +84,11 @@ class ObjectDetectionModel:
         self.gorev3 = None
         try:
             from gorev3 import Gorev3Matcher
-            self.gorev3 = Gorev3Matcher(kind="dinov3")
-            logging.info("Gorev 3 eslestirici yuklendi.")
+            # Yarisma ayari: rembg KAPALI (precision — yanlis pozitif mAP'i dusurur;
+            # gorsel testlerde rembg-off daha temiz/isabetli kutu verdi). Tiling
+            # (config'de acik) minik nesneleri de yakalar.
+            self.gorev3 = Gorev3Matcher(kind="dinov3", remove_bg=False)
+            logging.info("Gorev 3 eslestirici yuklendi (rembg kapali, tiling acik).")
             print("Gorev 3 eslestirici yuklendi.")
         except Exception as e:
             logging.error(f"Gorev 3 eslestirici YUKLENEMEDI (Gorev 1/2 devam eder): {e}")
