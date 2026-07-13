@@ -1,38 +1,19 @@
 import logging
+import os
 import time
-from collections import deque
 from datetime import datetime
 from pathlib import Path
-import cv2
-import numpy as np
-import requests
 from decouple import config
 from tqdm import tqdm
 from src.connection_handler import ConnectionHandler
 from src.frame_predictions import FramePredictions
 from src.object_detection_model import ObjectDetectionModel
 
-
-class RateLimiter:
-    """Sunucu limiti: dakikada en fazla 80 tahmin.
-
-    Limit asilirsa sunucu tahmini VERITABANINA YAZMAZ (connection_handler
-    dokumantasyonu) — yani asim dogrudan puan kaybidir. Bu sinif, son 60
-    saniyedeki gonderim sayisi 80'e ulastiginda gerektigi kadar bekler.
-    """
-
-    def __init__(self, max_per_minute=80, guvenlik_payi=0.25):
-        self.zamanlar = deque(maxlen=max_per_minute)
-        self.guvenlik_payi = guvenlik_payi
-
-    def bekle(self):
-        if len(self.zamanlar) == self.zamanlar.maxlen:
-            gecen = time.time() - self.zamanlar[0]
-            if gecen < 60.0:
-                time.sleep(60.0 - gecen + self.guvenlik_payi)
-
-    def kaydet(self):
-        self.zamanlar.append(time.time())
+# Kare arasi minimum sure. GUVENLI TARAF: 0.75s taban => en fazla ~80 gonderim/dk
+# (duyurulan bilinen limit). Yarisma 90 dk / 2250 kare = ~25 kare/dk yeter; bol zaman
+# payi oldugu icin muhafazakar hiz risksiz (limit asimi = kayip tahmin). Zaten kare basi
+# hesap (~0.7-1 s) cogu zaman bu tabanin ustunde; taban yalnizca cok hizli kareleri sinirlar.
+MIN_FRAME_INTERVAL = 0.75
 
 
 def configure_logger(team_name):
@@ -45,70 +26,144 @@ def configure_logger(team_name):
 
 def run():
     print("Started...")
-    # .env dosyasından konfigurasyon icin gereken bilgileri cek
     config.search_path = "./config/"
     team_name = config('TEAM_NAME')
     password = config('PASSWORD')
     evaluation_server_url = config("EVALUATION_SERVER_URL")
 
-    # Logger'a ilgili konfigurasyon atamasini yap
     configure_logger(team_name)
 
-    # Takimlar kendi kodlarini ObjectDetectionModel sinifi icerisine implemente edebilirler. (OPSIYONEL)
     detection_model = ObjectDetectionModel(evaluation_server_url)
 
-    # Sunucuya baglan
     server = ConnectionHandler(evaluation_server_url, username=team_name, password=password)
 
-    # /media gorsel indirmesi kimlik dogrulama ister -> token'i modele ver
+    # /media gorsel indirmesi kimlik dogrulama ister -> token'i modele de ver
+    # (process'e ayrica gecilir; bu yedek).
     detection_model.auth_token = server.auth_token
 
-    # Mevcutta aktif olan oturumdan tum frameleri cek.
-    frames_json = server.get_frames(force_download=True)
+    # Check where we left off — safe to call after reconnect.
+    # get_progress() returns None ONLY when the server is unreachable (after retries);
+    # a genuine "no active session" comes back as a dict with session_name == None.
+    progress = server.get_progress()
+    if progress is None:
+        print("Could not reach the evaluation server (progress check failed). "
+              "Check your connection and try again.")
+        return
+    if not progress['session_name']:
+        print("No active session found. Exiting.")
+        return
 
-    # Mevcutta aktif olan oturumdan tum translation verilerini cek.
-    translations_json = server.get_translations(force_download=True)  
+    if progress['completed']:
+        print(f"All {progress['total_frames']} frames already submitted. Nothing to do.")
+        return
 
-    # Klasorun ve dosyanin yollarini cekelim
-    images_files, images_folder = server.get_listdir()
+    session_name = progress['session_name']
+    total_frames = progress['total_frames']
+    start_index = progress['frame_index']
+    print(f"Session: {session_name} — resuming from frame {start_index + 1} of {total_frames}")
 
-    # Gorev 3 referans nesnelerini kaydet (varsa). Sunucu, frames-JSON'daki
-    # `references` anahtarinda referans objeleri veriyor. DIKKAT: referanslar ilk
-    # karede degil, ilgili kare araliginin BASINDA gorunuyor (or. frame 165) — bu
-    # yuzden TUM kareler taranir, sadece frames_json[0] degil. register_from_server
-    # ayni `order`i tekrar kaydetmez. references hic yoksa NO-OP: Gorev 2 korunur.
-    referanslar = []
-    for _fr in (frames_json or []):
-        referanslar.extend(_fr.get("references", []) or [])
-    if referanslar:
-        def _ref_indir(url):
-            tam = url if str(url).startswith("http") else evaluation_server_url + "media" + url
-            r = requests.get(tam, headers={"Authorization": f"Token {server.auth_token}"}, timeout=60)
-            return cv2.imdecode(np.frombuffer(r.content, np.uint8), cv2.IMREAD_COLOR)
-        n_ref = detection_model.register_references(referanslar, download=_ref_indir)
-        logging.info(f"Gorev 3: {n_ref} referans kaydedildi (sunucudan).")
+    # Prepare image storage
+    server.video_name = session_name + "/"
+    server.create_img_folder(server.video_name)
+    images_folder = os.path.join(server.img_save_path, server.video_name)
+
+    references_folder = os.path.join(images_folder, "references") + os.sep
+    Path(references_folder).mkdir(parents=True, exist_ok=True)
+
+    # Gorev 3: TUM referans nesnelerini ve [frame_start, frame_end] araliklarini en
+    # bastan TEK seferde cek (GET /reference/, 5/m limit).
+    all_references = server.get_reference_objects(force_download=True) or []
+    logging.info(f"Loaded {len(all_references)} reference object(s) for the session.")
+    ref_image_paths = {}
+
+    # Gorev 3: TUM referans goruntularini pencereyi beklemeden en bastan indir.
+    # NOT: Bu yalnizca sunucu media-auth kapisi referans goruntulerini ilerlemeden
+    # bagimsiz actiysa calisir; aksi halde penceresi henuz baslamayan referanslar
+    # icin sunucu 403 doner. Her indirme bir media-auth alt-istegi uretir (300/m
+    # limit); referans sayisi cok yuksekse bu baslangic patlamasini limit altinda tutun.
+    for ref in all_references:
+        ref_image_url = (ref['image_url'] if ref['image_url'].startswith('http')
+                         else evaluation_server_url + "media" + ref['image_url'])
+        detection_model.download_image(ref_image_url, references_folder,
+                                       os.listdir(references_folder),
+                                       auth_token=server.auth_token)
+        ref_image_paths[ref['url']] = references_folder + ref_image_url.split("/")[-1]
+    logging.info(f"Pre-downloaded {len(ref_image_paths)} reference image(s) up front.")
+
+    # Gorev 3: referanslari matcher'a KAYDET — DINOv3 ozniteliklerini bir kez cikarir
+    # (main'in yukarida indirdigi yerel gorsellerden). Referans yoksa NO-OP; Gorev 1/2
+    # her durumda calisir.
+    if all_references:
+        n_ref = detection_model.register_references(all_references, ref_image_paths=ref_image_paths)
+        logging.info(f"Gorev 3: {n_ref} referans matcher'a kaydedildi.")
         print(f"Gorev 3: {n_ref} referans kaydedildi.")
 
-    # 80 tahmin/dk sunucu limiti icin tempo denetleyici
-    limiter = RateLimiter(max_per_minute=80)
+    # tqdm progress bar — mutlak yarisma ilerlemesi (resume'de gercek yuzdeyi gosterir;
+    # orn. 1000'in 500'unden devam edince %50'den baslar). ETA degismez (kalan = total - n).
+    stuck_image_url = None
+    stuck_count = 0
+    with tqdm(total=total_frames, initial=start_index, desc="Frames") as pbar:
+        while True:
+            frame_start = time.monotonic()
+            # Sunucu her çağrıda yalnızca sıradaki tek kareyi döner.
+            frame = server.get_current_frame()
+            if frame is None:
+                print("Session complete or no active session.")
+                break
 
-    # Nesne tespiti modelini frame frame olacak sekilde calistir
-    for frame, translation in tqdm(zip(frames_json, translations_json), total=len(frames_json)):
-        # Prediction objesini frame ve translation bilgilerini tutacak sekilde olustur
-        predictions = FramePredictions(frame['url'], frame['image_url'], frame['video_name'],
-                                       translation['translation_x'], translation['translation_y'], translation['translation_z'])
-        # Healt status kontrolu ikinci gorevde sistemin ne zaman devreye girmesi gerektigini gosterir
-        health_status = translation['health_status']
-        # Tespit modelini calistir
-        predictions = detection_model.process(predictions, evaluation_server_url, health_status, images_folder, images_files)
-        # Limiti asmamak icin gerekiyorsa bekle, sonra gonder
-        limiter.bekle()
-        result = server.send_prediction(predictions)
-        limiter.kaydet()
+            if frame['image_url'] == stuck_image_url:
+                stuck_count += 1
+                if stuck_count >= 5:
+                    logging.error(f"Frame {frame['image_url']} did not advance after "
+                                  f"{stuck_count} submissions; aborting to avoid an infinite loop.")
+                    print("Aborting: current frame is not advancing (check logs).")
+                    break
+            else:
+                stuck_image_url = frame['image_url']
+                stuck_count = 0
 
-    # oturum sonu: kare basina islem suresi ozeti (yarisma butcesi ~1.3 s/kare)
-    logging.info(f"Islem suresi ozeti: {detection_model.position_estimator.timing_stats}")
-    print(f"Islem suresi ozeti: {detection_model.position_estimator.timing_stats}")
+            translation = server.get_current_translation()
+            if translation is None:
+                logging.warning("Translation unavailable for current frame; "
+                                "submitting a detection-only prediction to advance.")
+                health_status = None
+                gt_x = gt_y = gt_z = None
+            else:
+                health_status = translation['health_status']
+                gt_x = translation['translation_x']
+                gt_y = translation['translation_y']
+                gt_z = translation['translation_z']
+
+            images_files = os.listdir(images_folder)
+
+            # Bu kare icin aktif (pencere-ici) referanslar. Goruntuleri yukarida en
+            # bastan toptan indirildigi icin burada ayrica indirme yapilmaz; bu liste
+            # yalnizca asagidaki detect() cagrisina iletilir.
+            active_refs = [
+                r for r in all_references
+                if r.get('frame_start_image_url') and r.get('frame_end_image_url')
+                and r['frame_start_image_url'] <= frame['image_url'] <= r['frame_end_image_url']
+            ]
+
+            predictions = FramePredictions(
+                frame['url'], frame['image_url'], frame['video_name'],
+                gt_x, gt_y, gt_z
+            )
+
+            predictions = detection_model.process(
+                predictions, evaluation_server_url, health_status,
+                images_folder, images_files,
+                active_refs=active_refs,
+                ref_image_paths=ref_image_paths,
+                auth_token=server.auth_token,
+            )
+
+            server.send_prediction(predictions)
+            pbar.update(1)
+
+            elapsed = time.monotonic() - frame_start
+            if elapsed < MIN_FRAME_INTERVAL:
+                time.sleep(MIN_FRAME_INTERVAL - elapsed)
 
 
 if __name__ == '__main__':

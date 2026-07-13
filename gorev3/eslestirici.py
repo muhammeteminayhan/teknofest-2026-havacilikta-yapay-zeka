@@ -11,7 +11,8 @@ Omurga tercihi:
     kendi omurgasını yükler (~0,1 GB VRAM). İstenirse "dinov2"ye tek satırla geçilir.
 
 Çıktı: her eşleşme için {object_id, top_left_x/y, bottom_right_x/y} sözlüğü;
-`sistem` tarafında `DetectedUndefinedObject`e çevrilir.
+`sistem` tarafında `ReferencePrediction`a (referansın kendi url'i + kare url'i +
+bbox) çevrilir.
 """
 from __future__ import annotations
 
@@ -102,16 +103,19 @@ class Gorev3Matcher:
         logging.info(f"Gorev3: referans {object_id} kaydedildi (aralik={frame_range}, "
                      f"toplam {self.n_ref}).")
 
-    def register_from_server(self, references: list, download: Optional[Callable] = None) -> int:
-        """Sunucudan gelen frames-JSON `references` girdilerini kaydet.
+    def register_from_server(self, references: list, download: Optional[Callable] = None,
+                             ref_image_paths: Optional[dict] = None) -> int:
+        """Sunucudan (`GET /reference/`) gelen referans girdilerini kaydet.
 
-        Gerçek sunucu formatı (gözlemlendi): her referans bir sözlük —
-          `image_url`  : referans görselinin yolu,
-          `order`      : referans kimliği (1, 2, ...),
-          `frame_start`/`frame_end` : referansın aranacağı kare aralığı (URL'lerden id).
-        Aynı `order` ikinci kez gelirse ATLANIR (idempotent — rolling oturumda referans
-        birden çok karede görünebilir). `download(url)` verilirse görseli auth'lu indirir.
-        Hata olursa o referans atlanır (Görev 3 çökmez). Kaydedilen YENİ referans sayısı döner."""
+        Gerçek sunucu formatı: her referans bir sözlük —
+          `url`        : referansın API url'i (submission'da `reference` alanı),
+          `image_url`  : referans görselinin media yolu,
+          `order`      : referans sırası/kimliği (1, 2, ...),
+          `frame_start`/`frame_end` : referansın aranacağı kare aralığı.
+        Görsel önceliği: `ref_image_paths[ref['url']]` (main.py oturum başında toptan
+        indirir) → yoksa `download(image_url)` → yoksa yerel `image_url`. Aynı `order`
+        ikinci kez gelirse ATLANIR (idempotent). Hata olursa o referans atlanır (Görev 3
+        çökmez). Kaydedilen YENİ referans sayısı döner."""
         if not references:
             return 0
         n = 0
@@ -122,11 +126,21 @@ class Gorev3Matcher:
                 oid = int(ref.get("order", ref.get("object_id", ref.get("id", i))))
                 if oid in self.kayitli_orderlar:
                     continue  # bu referans zaten kayitli
-                url = ref.get("image_url") or ref.get("url") or ref.get("reference_url")
+                # Referans API url'i (submission) ile görsel media yolu AYRIDIR.
+                ref_url = ref.get("url") or ref.get("reference_url")
+                img_url = ref.get("image_url") or ref_url
                 fr = (_frame_id_cek(ref.get("frame_start")), _frame_id_cek(ref.get("frame_end")))
-                img = download(url) if (download and url) else (cv2.imread(str(url)) if url else None)
+                yerel = ref_image_paths.get(ref_url) if (ref_image_paths and ref_url) else None
+                if yerel:
+                    img = cv2.imread(str(yerel))          # main'in önceden indirdiği görsel
+                elif download and img_url:
+                    img = download(img_url)               # auth'lu indir
+                elif img_url:
+                    img = cv2.imread(str(img_url))        # yerel yol
+                else:
+                    img = None
                 if img is None:
-                    logging.error(f"Gorev3: referans order={oid} görseli okunamadı ({url}).")
+                    logging.error(f"Gorev3: referans order={oid} görseli okunamadı ({img_url}).")
                     continue
                 self.register_reference(img, object_id=oid,
                                         frame_range=fr if fr[0] is not None else None)
@@ -139,17 +153,21 @@ class Gorev3Matcher:
         return n
 
     # ── Eşleme ──────────────────────────────────────────────────────────────
-    def match(self, frame_bgr: np.ndarray, frame_id: Optional[int] = None) -> list[dict]:
+    def match(self, frame_bgr: np.ndarray, frame_id: Optional[int] = None,
+              active_ids: Optional[set] = None) -> list[dict]:
         """Kareyi referanslarla eşle; şema sözlükleri döndür. Referans yoksa [].
 
-        `frame_id` verilirse referanslar SADECE kendi `frame_start..frame_end`
-        aralığında aranır — aralık dışı yanlış pozitifler engellenir. Aralığı
-        bilinmeyen referans her karede aranır (geriye dönük uyum)."""
+        `active_ids` verilirse (main.py'nin bu kare için pencere-içi seçtiği
+        referansların `order`'ları) SADECE o referanslar aranır — en güvenilir kapı,
+        çünkü pencere kontrolü main'de resmî `frame_start/end_image_url` ile yapılır.
+        Verilmezse `frame_id` aralığına, o da yoksa tüm referanslara düşülür."""
         if self.n_ref == 0:
             return []
         tum = self.matcher.references
         secili = tum
-        if frame_id is not None and self.ref_araliklar:
+        if active_ids is not None:
+            secili = [r for r in tum if r.object_id in active_ids]
+        elif frame_id is not None and self.ref_araliklar:
             aktif = {oid for oid, (a, b) in self.ref_araliklar.items()
                      if a is None or b is None or a <= frame_id <= b}
             # aralığı olmayan referanslar her zaman aktif

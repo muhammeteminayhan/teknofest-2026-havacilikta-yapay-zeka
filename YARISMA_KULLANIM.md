@@ -3,35 +3,41 @@
 Bu dosya, yarışma günü sistemi **adım adım** nasıl çalıştıracağını anlatır. Sistem üç görevi
 (Görev 1 nesne tespiti + Görev 2 konum + Görev 3 görüntü eşleme) tek komutla, otomatik yapar.
 
+Bağlantı katmanı **resmî Takım Bağlantı Arayüzü (13 Tem sürümü)** ile birebir uyumludur:
+sunucu kareleri **teker teker** verir, sistem **kaldığı yerden** devam eder, referanslar
+**`/reference/` ucundan** otomatik gelir.
+
 > **Bu makinede her şey hazır.** Ek kurulum yok; sadece aşağıdaki adımları izle.
+
+> ⚠️ **EN ÖNEMLİ KURAL:** Sunucu her kareye **yalnızca BİR kez** tahmin kabul eder (tekrar =
+> `406`). Bu yüzden **puanlı yarışma oturumunda** sistem hazır değilken `main.py` **çalıştırma** —
+> yanlış tahminler kalıcı kaydolur, geri alınamaz. Denemeleri **test oturumunda** yap.
 
 ---
 
 ## 1) Ön-uçuş kontrol listesi (yarışmadan önce bir kez)
 
 - [ ] **Sanal ortam var:** `havacilikta-yz-project\.venv` (Python 3.13, CUDA'lı torch)
-- [ ] **GPU çalışıyor:** aşağıdaki komut `cuda: True` yazmalı
-  ```
-  .venv\Scripts\python -c "import torch; print('cuda:', torch.cuda.is_available())"
-  ```
-- [ ] **Çevrimdışı önbellekler yerinde** (internetsiz de çalışsın diye):
-  - DINOv3 (Görev 3): `C:\Users\<sen>\.cache\huggingface\hub\models--facebook--dinov3-vits16-...`
-  - RAFT (Görev 2): torchvision önbelleği (otomatik)
-  - *(Not: rembg/u2net artık gerekmiyor — Görev 3 rembg kapalı çalışıyor.)*
-- [ ] **Sunucu bilgileri doğru:** `sistem\config\.env.online` içinde takım adı + şifre + URL
+- [ ] **GPU çalışıyor:** `.venv\Scripts\python -c "import torch; print('cuda:', torch.cuda.is_available())"` → `True`
+- [ ] **Çevrimdışı önbellekler yerinde:** DINOv3 (`~/.cache/huggingface`), RAFT (torchvision cache).
+      *(rembg/u2net gerekmiyor — Görev 3 rembg kapalı.)*
+- [ ] **Sunucu bilgileri doğru:** `sistem\config\.env.online`
+      → `EVALUATION_SERVER_URL="http://havaciliktayapayzeka.teknofest.org:1025/"` + takım adı + şifre
 
 ---
 
-## 2) (Önce) Hızlı bağlantı testi — model yüklemeden
+## 2) (Önce) Bağlantı testi — SALT OKUNUR, tahmin GÖNDERMEZ
 
-Sunucuya erişimi + tahmin gönderimini saniyeler içinde doğrular:
+Sunucuya erişimi ve yeni okuma uçlarını (progress / kare / referans) **hiçbir tahmin
+göndermeden** doğrular — puanlı oturumda bile güvenlidir:
 ```
 cd sistem
 copy config\.env.online config\.env
 ..\.venv\Scripts\python baglanti_testi.py
 ```
-**Beklenen:** login başarılı + birkaç örnek tahmin **201** döner. (Sunucu kapalıysa bağlantı
-hatası verir — normal, sunucunun açılmasını bekle.)
+**Beklenen:** `OK login` + `progress` (oturum adı / toplam kare / kalınan kare) + `current_frame`
+ve `current_translation` şeması + `get_reference_objects` (referans varsa) + `/media` indirme
+`HTTP 200`. Hata verirse sunucu kapalı/erişilemez ya da `.env` yanlış demektir.
 
 ---
 
@@ -43,42 +49,45 @@ copy config\.env.online config\.env       :: online sunucuyu aktif et ("Overwrit
 ..\.venv\Scripts\python main.py
 ```
 
-Bu kadar. Sistem otomatik olarak:
-1. Sunucuya login olur,
-2. Kareleri tek tek çeker,
-3. Her karede **Görev 1 + Görev 2 + Görev 3**'ü çalıştırır,
-4. Tahmini sunucuya gönderir (**201** = kabul),
-5. Görev 3 referansları `references` anahtarından **otomatik** kaydolur (elle bir şey yapmana gerek yok).
+Sistem otomatik olarak:
+1. Sunucuya login olur, **`get_progress` ile nerede kaldığını bulur** (bağlantı koparsa aynı
+   komutla **kaldığı kareden devam eder**),
+2. Tüm referansları `/reference/`'ten çeker, görüntülerini indirir, Görev 3 eşleştiricisine kaydeder,
+3. Kareleri **teker teker** çeker; her karede **Görev 1 + Görev 2 + Görev 3**'ü çalıştırır,
+4. Tahmini gönderir (**201** = kabul) ve bir sonraki kareye geçer.
 
 ---
 
 ## 4) Çalışırken ne izlemelisin
 
-Açılışta şunları görmelisin:
+Açılışta:
 ```
 On kontrol: {... 'cuda': True, 'raft_agirliklari_yerel': True, 'onerilen_motor': 'raft'}
 Gorev 1 detektoru yuklendi.
-Gorev 3 eslestirici yuklendi (rembg kapali, tiling acik).
+Gorev 3 eslestirici yuklendi.
+Session: <oturum> — resuming from frame N of 2250
+Gorev 3: K referans kaydedildi.
 ```
-Sonra her kare için ilerleme çubuğu + sunucudan **201**.
+Sonra kare kare ilerleyen bir çubuk (`Frames: ... / 2250`).
 
 **Loglar:** `sistem\_logs\<takım>_<tarih>.log` — her karede tek satır özet:
 ```
 [Gorev2 echo]   konum=(x,y,z) m | [Gorev1] N nesne | [Gorev3] M eslesme     (saglikli kare)
 [Gorev2 TAHMIN] konum=(x,y,z) m | ...                                        (kesinti karesi)
+[Gorev2 yok]    ...                                                          (ceviri gelmedi)
 ```
-- `echo` = sağlıklı kare (gelen konumu aynen gönderiyor, 0 hata)
-- `TAHMIN` = kesinti karesi (RAFT ile konum kestiriyor)
 
 ---
 
 ## 5) Bilmen gerekenler
 
-- **80 tahmin/dk sınırı:** sistem otomatik yönetiyor (RateLimiter). Aşım = ceza, ama sen bir şey yapmıyorsun.
-- **Sunucu günlük sıfırlanır:** her gün taze oturum.
-- **İnternetsiz de çalışır:** modeller önbellekte. İstersen doğrulamak için Wi-Fi kapalıyken çalıştır.
-- **Görev sürümü:** Görev 3 = DINOv3 + **tiling** (minik nesneleri de yakalar) + **rembg kapalı**
-  (yanlış pozitif az). Görev 2 = RAFT+homografi (en güçlü, ~3.5 m). Görev 1 = YOLOv8s.
+- **Gönderim hızı:** sistem her kare arasında en az ~0,75 sn bekler → **≤80 gönderim/dk**
+  (güvenli taraf). Yarışma 90 dk / 2250 kare için bol zaman payı var.
+- **Kaldığı yerden devam:** koşu koparsa aynı `main.py` komutunu tekrar çalıştır — `get_progress`
+  ile kalınan kareden sürer (bitmiş kareler tekrar gönderilmez).
+- **Görev 2 ilk 450 kare:** sağlıklı GT ile ölçek + koordinat hizalaması otomatik kurulur;
+  sonra kesinti karelerinde (health=0) kestirim üretilir. Kamera: 1080p parametreleri otomatik.
+- **İnternetsiz de çalışır:** modeller önbellekte (DINOv3 + RAFT).
 
 ---
 
@@ -86,24 +95,23 @@ Sonra her kare için ilerleme çubuğu + sunucudan **201**.
 
 | Belirti | Sebep / Çözüm |
 |---|---|
-| `Login Failed` / bağlantı hatası | Sunucu kapalı ya da `.env.online` yanlış. Bilgileri kontrol et, sunucunun açık olduğundan emin ol. |
-| `Copy-Item` tanınmıyor | cmd kullanıyorsun; `Copy-Item` yerine `copy` yaz (yukarıdaki komutlarda `copy` var). |
-| HTTP **406** | O kareye zaten tahmin gönderilmiş (tekrar). Sistem otomatik geçer, sorun değil. |
-| `cuda: False` | GPU görünmüyor; Görev 2 otomatik LK yedeğine düşer (biraz daha düşük doğruluk) ama sistem çalışır. |
-| Görev 3 `0 eslesme` | Sunucu o oturumda referans göndermediyse normal (test oturumunda `references=[]` gelir). Gerçek referans gelince otomatik aranır. |
+| `Login Failed` / `progress None` | Sunucu kapalı ya da `.env.online` yanlış. Bilgileri ve sunucunun açık olduğunu kontrol et. |
+| `No active session found` | Sunucu henüz oturum açmamış. Duyurulan saati bekle. |
+| `Copy-Item` tanınmıyor | cmd'de `copy` kullan (komutlarda zaten `copy` var). |
+| HTTP **406** | O kareye zaten tahmin gönderilmiş. Sistem stuck-sayaçla korunur; 5 kez ilerlemezse durur. |
+| HTTP **403** | Hız limiti aşıldı (bu tahmin kaydedilmez). Hız zaten ≤80/dk; tekrarlarsa `MIN_FRAME_INTERVAL`'i artır. |
+| `cuda: False` | GPU görünmüyor; Görev 2 otomatik LK yedeğine düşer (biraz düşük doğruluk) ama çalışır. |
+| Görev 3 `0 referans` | Test oturumunda referans olmayabilir (normal). Gerçek yarışmada `/reference/`'ten gelince otomatik aranır. |
 
 ---
 
 ## Yerel test (yarışma öncesi prova, sunucusuz)
 
-Gerçek sunucu olmadan tüm sistemi örnek videoyla denemek için:
+Gerçek sunucu olmadan Görev 3 entegrasyonunu (yeni akış) yakalanan gerçek kareyle doğrula:
 ```
-:: 1. terminal — yerel simülatör (2250 kare sunar)
-.venv\Scripts\python gorev2\src\simulator.py
-:: 2. terminal — sistemi simülatöre bağla
-cd sistem
-copy config\.env.simulator config\.env
-..\.venv\Scripts\python main.py
+..\.venv\Scripts\python suni_test\entegrasyon_testi.py
 ```
+**Beklenen:** `YENI ARAYUZ ENTEGRASYONU CALISIYOR` — Görev 1+2+3 ateşlenir, `reference_predictions`
+doğru şemada, pencere dışı temiz.
 
-Daha fazla ayrıntı: kök [README.md](README.md) ve alt klasör README'leri (`gorev1/`, `gorev2/`, `gorev3/`, `sistem/`).
+Daha fazla ayrıntı: kök [README.md](README.md) ve alt klasör README'leri.

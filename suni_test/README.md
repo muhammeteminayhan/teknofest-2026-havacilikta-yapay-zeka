@@ -1,35 +1,28 @@
-# suni_test — Görev 3 entegrasyonu + tüm sistem doğrulaması
+# suni_test — Görev 3 entegrasyonu + yeni arayüz doğrulaması (çevrimdışı)
 
-Gerçek yarışma sunucusundan yakalanan kareler üzerinde, **Görev 3'ün ilgili olduğu
-referans aralıklarını** (her referansın `frame_start`..`frame_end` penceresini
-**başlangıç−3'ten bitiş+3'e** kadar) tam boru hattından (Görev 1+2+3) geçirir.
-
-**Amaç:** entegrasyonun ve tüm sistemin doğru çalıştığını göstermek —
-- Referanslar geldiğinde kaydediliyor mu (order 1 ve 2),
-- Görev 3 **yalnızca kendi kare aralığında** aranıyor mu (aralık dışında değil),
-- Her karede `detect()` üç görevi de hatasız koşturuyor mu.
+Gerçek yarışma sunucusundan yakalanan kareler + referans görselleri üzerinde, **13 Tem resmî
+arayüze uyarlanmış** boru hattını (Görev 1+2+3) sunucu olmadan doğrular.
 
 ## Dosyalar
-- `suni_test.py` — test scripti.
-- `suni_test_sonuc.csv` — 189 karenin kare-kare özeti (frame, aralık, aranan referans, eşleşme, durum).
-- `bizim_cevaplar.jsonl` — 189 karenin **sunucuya göndereceğimiz tam payload'ı**
-  (detected_objects + detected_translations + detected_undefined_objects).
+- **`entegrasyon_testi.py`** — YENİ akış uçtan uca testi. `register_references(YENİ format,
+  ref_image_paths)` → `detect(pred, health, img, active_refs=...)` → çıktı resmî
+  **`reference_predictions`** şemasında (`reference`=ref url, `frame`=kare url, bbox).
+  Doğrular: (a) referanslar kaydoluyor, (b) Görev 1+2+3 ateşleniyor, (c) Görev 3 **doğru url +
+  şema** üretiyor, (d) **pencere dışı temiz** (yanlış pozitif yok).
+- `gorev3_gorsel_test.py` — düzeltilmiş eşleştiriciyi görsel doğrulama (biçerdöver + halı saha
+  kutuları çizili figür üretir: `gorev3_fix_reference_1/2.png`).
 
-## Sonuç (kaydedilen koşumdan)
-- **189 test karesi, 0 detect() hatası, 0 aralık-filtre yanlışı.**
-- Sınır davranışı: `164→165` aranan `[]→[1]` (aralık başladı), `209→210` `[1]→[]` (bitti),
-  `524→525` `[]→[2]`. ±3 tampon karelerinde Görev 3 hiç aranmadı.
-- Görev 3 aralık içinde **doğru object_id ile** çıktı üretti (40 kare). **Ancak kutular
-  hâlâ "tüm-kare" yanlış pozitif** — bu **algoritma/eşleşme kalitesi** meselesi
-  (`gorev3/template_matcher.py`), entegrasyon değil.
-- Görev 2 konum değerleri bu **izole** replay'de kalibre olmadığından (aralığa "atlanıyor")
-  doğru değildir — sistem hatası değil, test kurgusu yan etkisi.
-
-## Tekrar çalıştırmak için
-`sistem/sunucu_ciktilari/` (yakalanan gerçek kareler + referans görselleri) gerekir; o klasör
-repoya dahil DEĞİL (büyük/geçici). Buradaki `.csv` ve `.jsonl` çıktıları **inceleme için** eklidir.
-
+## Çalıştırmak için
+`sistem/sunucu_ciktilari/` (yakalanan gerçek kareler + `reference_1/2.png`) gerekir; büyük/geçici
+olduğu için repoya dahil DEĞİL.
 ```
-# proje kökünden
-.venv\Scripts\python suni_test\suni_test.py
+# proje kökünden (çevrimdışı da çalışır)
+..\.venv\Scripts\python suni_test\entegrasyon_testi.py
 ```
+**Beklenen çıktı:** `YENI ARAYUZ ENTEGRASYONU CALISIYOR` — Görev 1+2+3 ateşlendi;
+`reference_predictions` doğru url+şema; pencere dışı temiz; sema/yanlış-pozitif hatası 0.
+
+## Not
+Referansın penceresinin **her** karesinde eşleşmesi beklenmez (görünürlük/güven eşiğine bağlı);
+test bunu tespit-farkında değerlendirir: eşleşme olursa url+şema doğru olmalı, pencere dışında
+kesinlikle boş olmalı, ve her referans en az bir karede eşleşmeli.

@@ -64,15 +64,17 @@ cd sistem
 Aşağıdaki testleri **sırayla** yaparsanız, hafiften ağıra doğru her katmanı ayrı ayrı
 doğrulamış olursunuz. Hepsi proje kökünden çalıştırılır (aksi belirtilmedikçe).
 
-### Test 1 — Ağ katmanı (en hızlı, model yüklemez)
-Gerçek sunucuya erişimi, şemayı ve tahmin gönderimini (201) doğrular.
+### Test 1 — Ağ katmanı (en hızlı, model yüklemez, SALT OKUNUR)
+Gerçek sunucuya erişimi ve yeni okuma uçlarını (progress / kare / çeviri / referans) doğrular.
+**Hiçbir tahmin göndermez** — puanlı oturumda bile güvenlidir.
 ```powershell
 Copy-Item sistem\config\.env.online sistem\config\.env
 cd sistem
 ..\.venv\Scripts\python baglanti_testi.py
 ```
-**Beklenen:** login başarılı, kare/translation şeması yazdırılır, ~10 tahmin `201` döner.
-Hata alırsanız sunucu kapalı olabilir (sunucu 09-15 Tem arası açıktı, sonuçlar günlük sıfırlanır).
+**Beklenen:** `OK login` + `progress` (oturum/toplam kare/kalınan kare) + `current_frame` ve
+`current_translation` şeması + `/media` indirme `HTTP 200`. Hata alırsanız sunucu kapalı olabilir
+(sonuçlar günlük sıfırlanır).
 
 ### Test 2 — Görev 1 tek başına (nesne tespiti)
 ```powershell
