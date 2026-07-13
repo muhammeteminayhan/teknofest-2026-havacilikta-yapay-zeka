@@ -82,6 +82,9 @@ def run():
         print("\nUYARI: get_current_translation bos (bu kare icin ceviri yok olabilir).")
 
     # 5) get_reference_objects — Gorev 3 referanslari (/reference/ ucu)
+    # Referans onbellegi icin klasoru olustur (main.py da boyle yapar; yoksa zararsiz uyari).
+    server.video_name = progress["session_name"] + "/"
+    server.create_img_folder(server.video_name)
     refs = server.get_reference_objects(force_download=True)
     if refs:
         print(f"\nOK get_reference_objects: {len(refs)} referans")
