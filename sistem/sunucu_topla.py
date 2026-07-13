@@ -1,19 +1,28 @@
 # -*- coding: utf-8 -*-
-"""GERCEK sunucu kesif toplayicisi — SADECE TEST/GORME (calisan sistemi bozmaz).
+"""GERCEK sunucu TAM VERI TOPLAYICISI — yeni rolling arayuz + gercek model.
 
-Gercek competition sunucusuna dongüyle istek atar (rate limitlere uyarak) ve her
-iterasyonun HER SEYINI kaydeder: sunucunun ham frames.json + translations.json,
-indirilen gorsel, bizim POST ettigimiz cevap (payload) ve sunucunun yaniti (201/406/..).
-Amac: test oturumu kac kare veriyor, kare nasil ilerliyor, limitler nasil davraniyor GORMEK.
+Test oturumunu bastan sona (2250 kare) kosar ve HER SEYI `sistem/sunucu_ciktilari/`'na
+kaydeder:
+  references.json + references/reference_N.webp     (Gorev 3 referanslari + gorselleri)
+  frames/<image>.webp                               (her karenin gorseli)
+  sunucu_frames.jsonl / sunucu_translations.jsonl   (ham sunucu verisi, kare basi 1 satir)
+  bizim_cevaplar.jsonl                              (POST ettigimiz TAM payload, kare basi)
+  sunucu_yanitlari.jsonl                            (HTTP kod + govde, kare basi)
+  ozet.csv                                         (okunur: frame_id/health/tahmin/G1/G3/kod)
+  kosum.log + ozet.txt                             (calisma logu + final istatistik)
 
-Kullanim (sistem/ klasorunden, sunucu ACIK olmali):
-    ..\\.venv\\Scripts\\python sunucu_topla.py --max 15
-    ..\\.venv\\Scripts\\python sunucu_topla.py --max 15 --bekle 13 --gorevsiz  # model yuklemeden hizli
+DIKKAT: Kareyi ilerletmek icin test oturumuna TAHMIN GONDERIR — PUANLI oturumda CALISTIRMA!
+Sadece test oturumunda (gunluk sifirlanir) kullan.
 
-Cikti: sistem/sunucu_ciktilari/
+Kullanim (sistem/ klasorunden, config/.env = .env.online):
+    ..\\.venv\\Scripts\\python sunucu_topla.py            # tam kosu (session bitene kadar)
+    ..\\.venv\\Scripts\\python sunucu_topla.py --max 50   # kisa deneme
 """
 import argparse
+import csv
 import json
+import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -21,142 +30,217 @@ from pathlib import Path
 import cv2
 import numpy as np
 import requests
-from decouple import Config, RepositoryEnv
+from decouple import config
 
-CIKTI = Path(__file__).resolve().parent / "sunucu_ciktilari"
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from src.connection_handler import ConnectionHandler          # noqa: E402
+from src.frame_predictions import FramePredictions            # noqa: E402
+from src.object_detection_model import ObjectDetectionModel   # noqa: E402
+
+CIKTI = HERE / "sunucu_ciktilari"
+MIN_FRAME_INTERVAL = 0.75   # <=80 gonderim/dk (guvenli)
+
+
+def _indir(base, token, image_url):
+    turl = image_url if str(image_url).startswith("http") else base + "media" + image_url
+    r = requests.get(turl, headers={"Authorization": f"Token {token}"}, timeout=60)
+    r.raise_for_status()
+    return r.content
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--max", type=int, default=15, help="en fazla iterasyon")
-    ap.add_argument("--bekle", type=float, default=13.0, help="get_frames arasi sn (5/dk altinda)")
-    ap.add_argument("--gorevsiz", action="store_true",
-                    help="modelleri yukleme; tahmin yerine echo/0 gonder (mekanizmayi hizli gor)")
-    ap.add_argument("--dur-tekrar", type=int, default=4,
-                    help="kare id bu kadar kez ilerlemezse dur")
+    ap.add_argument("--max", type=int, default=None,
+                    help="en fazla kare (varsayilan: oturum bitene kadar ~2250)")
     args = ap.parse_args()
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from src.connection_handler import ConnectionHandler
-    from src.frame_predictions import FramePredictions
-    from src.detected_translation import DetectedTranslation
-
-    # --- online kimlik (.env.online'i DOGRUDAN oku; aktif .env'e dokunma) ---
-    cfg = Config(RepositoryEnv(str(Path(__file__).resolve().parent / "config" / ".env.online")))
-    base = cfg("EVALUATION_SERVER_URL")
-    server = ConnectionHandler(base, username=cfg("TEAM_NAME"), password=cfg("PASSWORD"))
-    if not server.auth_token:
-        print("HATA: login basarisiz — sunucu kapali ya da kimlik yanlis.")
-        return
-    print(f"Login OK. Sunucu: {base}")
-
-    # --- model (gercek cevap icin) ---
-    model = None
-    if not args.gorevsiz:
-        from src.object_detection_model import ObjectDetectionModel
-        model = ObjectDetectionModel(base)
-        model.auth_token = server.auth_token
+    config.search_path = "./config/"
+    base = config("EVALUATION_SERVER_URL")
+    team = config("TEAM_NAME")
+    pw = config("PASSWORD")
 
     CIKTI.mkdir(parents=True, exist_ok=True)
-    toplu = open(CIKTI / "toplu.jsonl", "w", encoding="utf-8")
+    (CIKTI / "frames").mkdir(exist_ok=True)
+    (CIKTI / "references").mkdir(exist_ok=True)
 
-    gorulen_idler, son_id, tekrar = [], None, 0
+    logging.basicConfig(filename=str(CIKTI / "kosum.log"), level=logging.INFO, encoding="utf-8",
+                        format="%(asctime)s - %(levelname)s - %(message)s")
+
+    def yaz(m):
+        print(m, flush=True)
+        logging.info(m)
+
+    yaz(f"=== SUNUCU VERI TOPLAMA (tam, gercek model) === {base}")
+
+    # Model (gercek cevap icin) + baglanti
+    model = ObjectDetectionModel(base)
+    server = ConnectionHandler(base, username=team, password=pw)
+    model.auth_token = server.auth_token
+    if not server.auth_token:
+        yaz("HATA: login basarisiz — sunucu kapali ya da kimlik yanlis.")
+        return
+
+    progress = server.get_progress()
+    if not progress or not progress.get("session_name"):
+        yaz(f"HATA: aktif oturum yok. progress={progress}")
+        return
+    session_name = progress["session_name"]
+    total = int(progress.get("total_frames") or 0)
+    yaz(f"Oturum: {session_name} | toplam {total} | baslangic frame_index={progress.get('frame_index')}")
+    if progress.get("completed"):
+        yaz("Oturum zaten TAMAMLANMIS (completed=True). Sifirlanmasini bekle. Cikiliyor.")
+        return
+
+    server.video_name = session_name + "/"
+    server.create_img_folder(server.video_name)
+    images_folder = os.path.join(server.img_save_path, server.video_name)
+
+    # --- Referanslar (GET /reference/) + gorselleri indir + kaydet + kaydet(register) ---
+    refs = server.get_reference_objects(force_download=True) or []
+    (CIKTI / "references.json").write_text(
+        json.dumps(refs, ensure_ascii=False, indent=2), encoding="utf-8")
+    ref_image_paths = {}
+    for r in refs:
+        try:
+            icerik = _indir(base, server.auth_token, r["image_url"])
+            p = CIKTI / "references" / r["image_url"].split("/")[-1]
+            p.write_bytes(icerik)
+            ref_image_paths[r["url"]] = str(p)
+        except Exception as e:
+            yaz(f"UYARI: referans gorseli inemedi ({r.get('url')}): {e}")
+    n_ref = model.register_references(refs, ref_image_paths=ref_image_paths)
+    yaz(f"Referans: {len(refs)} cekildi, {n_ref} matcher'a kaydedildi.")
+
+    # --- cikti dosyalari (append yazim) ---
+    f_frames = open(CIKTI / "sunucu_frames.jsonl", "w", encoding="utf-8")
+    f_trans = open(CIKTI / "sunucu_translations.jsonl", "w", encoding="utf-8")
+    f_cevap = open(CIKTI / "bizim_cevaplar.jsonl", "w", encoding="utf-8")
+    f_yanit = open(CIKTI / "sunucu_yanitlari.jsonl", "w", encoding="utf-8")
+    f_ozet = open(CIKTI / "ozet.csv", "w", encoding="utf-8", newline="")
+    w = csv.writer(f_ozet)
+    w.writerow(["iter", "frame_id", "health", "tahmin_x", "tahmin_y", "tahmin_z",
+                "gorev1", "gorev3", "sunucu_kodu"])
+
     kodlar = {}
+    saglikli_say = kesinti_say = cevirisiz_say = refpred_say = 0
+    stuck_url = None
+    stuck_n = 0
+    i = 0
+    t0 = time.perf_counter()
 
-    for k in range(args.max):
-        if k > 0:
-            time.sleep(args.bekle)   # get_frames 5/dk limiti
-        try:
-            frames = server.get_frames(force_download=True)
-            translations = server.get_translations(force_download=True)
-        except Exception as e:
-            print(f"iter {k}: get_frames/translations hatasi: {e}")
+    while True:
+        if args.max is not None and i >= args.max:
+            yaz(f"--max {args.max} ulasildi, duruyorum.")
             break
-        if not frames:
-            print(f"iter {k}: sunucu kare dondurmedi, duruyorum.")
+        f_start = time.monotonic()
+
+        frame = server.get_current_frame()
+        if frame is None:
+            yaz("Oturum tamamlandi / kare yok — bitti.")
             break
 
-        fr, tr = frames[0], (translations[0] if translations else {})
-        fid = fr.get("id")
-        # ham sunucu yanitlarini kaydet
-        (CIKTI / f"iter_{k:03d}_frames.json").write_text(json.dumps(frames, ensure_ascii=False, indent=2), encoding="utf-8")
-        (CIKTI / f"iter_{k:03d}_translations.json").write_text(json.dumps(translations, ensure_ascii=False, indent=2), encoding="utf-8")
-
-        # Gorev 3 referanslari — HER iterasyonda kontrol et (referanslar farkli
-        # karelerde geliyor: reference_1 frame 165'te, reference_2 frame 525'te...).
-        # register_from_server ayni `order`i tekrar kaydetmez, o yuzden guvenli.
-        if model is not None and fr.get("references"):
-            def _ind(u):
-                t = u if str(u).startswith("http") else base + "media" + u
-                rr = requests.get(t, headers={"Authorization": f"Token {server.auth_token}"}, timeout=60)
-                return cv2.imdecode(np.frombuffer(rr.content, np.uint8), cv2.IMREAD_COLOR)
-            model.register_references(fr["references"], download=_ind)
-
-        # gorseli indir + kaydet
-        img = None
-        try:
-            iu = fr["image_url"]
-            turl = iu if str(iu).startswith("http") else base + "media" + iu
-            resp = requests.get(turl, headers={"Authorization": f"Token {server.auth_token}"}, timeout=60)
-            (CIKTI / f"iter_{k:03d}.webp").write_bytes(resp.content)
-            img = cv2.imdecode(np.frombuffer(resp.content, np.uint8), cv2.IMREAD_COLOR)
-        except Exception as e:
-            print(f"iter {k}: gorsel indirilemedi: {e}")
-
-        # tahmin uret (gercek model ya da echo)
-        pred = FramePredictions(fr["url"], fr.get("image_url"), fr.get("video_name"),
-                                tr.get("translation_x"), tr.get("translation_y"), tr.get("translation_z"))
-        hs = str(tr.get("health_status", "0"))
-        if model is not None and img is not None:
-            pred = model.detect(pred, hs, img)
-        else:
-            # gorevsiz: saglikliysa echo, degilse 0,0,0
-            if hs == "1":
-                pred.add_translation_object(DetectedTranslation(tr.get("translation_x"), tr.get("translation_y"), tr.get("translation_z")))
-            else:
-                pred.add_translation_object(DetectedTranslation(0.0, 0.0, 0.0))
-
-        payload = pred.create_payload(base)
-        (CIKTI / f"iter_{k:03d}_bizim_cevap.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-        # gonder + sunucu yanitini kaydet
-        r = server.send_prediction(pred)
-        kod = getattr(r, "status_code", None)
-        govde = getattr(r, "text", "")
-        (CIKTI / f"iter_{k:03d}_sunucu_yanit.txt").write_text(f"HTTP {kod}\n{govde}", encoding="utf-8")
-        kodlar[kod] = kodlar.get(kod, 0) + 1
-
-        # bizim tahmin edilen konum (ozet icin)
-        bt = payload["detected_translations"][0] if payload["detected_translations"] else {}
-        toplu.write(json.dumps({"iter": k, "frame_id": fid, "image_url": fr.get("image_url"),
-                                "health_status": hs, "bizim_translation": bt,
-                                "gorev1_nesne": len(payload["detected_objects"]),
-                                "gorev3_eslesme": len(payload["detected_undefined_objects"]),
-                                "sunucu_kodu": kod}, ensure_ascii=False) + "\n")
-        toplu.flush()
-
-        gorulen_idler.append(fid)
-        print(f"iter {k:02d} | frame id {fid} | health {hs} | sunucu {kod} | "
-              f"G1 {len(payload['detected_objects'])} G3 {len(payload['detected_undefined_objects'])}", flush=True)
-
-        # kare ilerliyor mu?
-        if fid == son_id:
-            tekrar += 1
-            if tekrar >= args.dur_tekrar:
-                print(f"Kare {args.dur_tekrar} kez ilerlemedi (id {fid}) — duruyorum.")
+        # stuck-detection (kare ilerlemiyorsa sonsuz donguden kac)
+        if frame["image_url"] == stuck_url:
+            stuck_n += 1
+            if stuck_n >= 5:
+                yaz(f"Kare 5 kez ilerlemedi ({frame['image_url']}) — duruyorum.")
                 break
         else:
-            tekrar = 0
-        son_id = fid
+            stuck_url = frame["image_url"]
+            stuck_n = 0
 
-    toplu.close()
-    farkli = sorted(set(x for x in gorulen_idler if x is not None))
-    print("\n=== RAPOR ===")
-    print(f"toplam iterasyon    : {len(gorulen_idler)}")
-    print(f"FARKLI kare (id)    : {len(farkli)} -> {farkli}")
-    print(f"sunucu kod dagilimi : {kodlar}")
-    print(f"Cikti: {CIKTI}")
-    print("Yorum: FARKLI kare cok azsa sunucu 2250'yi puanli oturumda verecek demektir.")
+        tr = server.get_current_translation()
+        if tr is None:
+            hs = None
+            gx = gy = gz = None
+        else:
+            hs = tr.get("health_status")
+            gx, gy, gz = tr.get("translation_x"), tr.get("translation_y"), tr.get("translation_z")
+
+        # gorseli indir + kaydet + oku
+        img = None
+        try:
+            icerik = _indir(base, server.auth_token, frame["image_url"])
+            (CIKTI / "frames" / frame["image_url"].split("/")[-1]).write_bytes(icerik)
+            img = cv2.imdecode(np.frombuffer(icerik, np.uint8), cv2.IMREAD_COLOR)
+        except Exception as e:
+            yaz(f"iter {i}: gorsel inemedi: {e}")
+
+        # bu kare icin aktif (pencere-ici) referanslar (resmi image_url kapisi)
+        active_refs = [
+            r for r in refs
+            if r.get("frame_start_image_url") and r.get("frame_end_image_url")
+            and r["frame_start_image_url"] <= frame["image_url"] <= r["frame_end_image_url"]
+        ]
+
+        # BIZIM CEVAP: tam boru hatti (Gorev 1+2+3)
+        pred = FramePredictions(frame["url"], frame["image_url"], frame["video_name"], gx, gy, gz)
+        pred = model.detect(pred, hs, img, active_refs=active_refs, ref_image_paths=ref_image_paths)
+        payload = pred.create_payload(base)
+
+        # gonder (201 = ilerle) + yaniti kaydet
+        resp = server.send_prediction(pred)
+        kod = getattr(resp, "status_code", None)
+        govde = getattr(resp, "text", "") or ""
+        kodlar[kod] = kodlar.get(kod, 0) + 1
+
+        # --- kaydet ---
+        f_frames.write(json.dumps(frame, ensure_ascii=False) + "\n")
+        f_trans.write(json.dumps(tr, ensure_ascii=False) + "\n")
+        f_cevap.write(json.dumps({"iter": i, "frame_id": frame.get("id"),
+                                  "payload": payload}, ensure_ascii=False) + "\n")
+        f_yanit.write(json.dumps({"iter": i, "frame_id": frame.get("id"),
+                                  "kod": kod, "govde": govde[:300]}, ensure_ascii=False) + "\n")
+
+        dt = payload["detected_translations"][0] if payload["detected_translations"] else {}
+        g1 = len(payload["detected_objects"])
+        g3 = len(payload["reference_predictions"])
+        refpred_say += g3
+        if hs is None:
+            cevirisiz_say += 1
+        elif str(hs) == "1":
+            saglikli_say += 1
+        else:
+            kesinti_say += 1
+        w.writerow([i, frame.get("id"), hs,
+                    dt.get("translation_x", ""), dt.get("translation_y", ""), dt.get("translation_z", ""),
+                    g1, g3, kod])
+
+        if i % 25 == 0:
+            for fh in (f_frames, f_trans, f_cevap, f_yanit, f_ozet):
+                fh.flush()
+            hiz = (i + 1) / (time.perf_counter() - t0)
+            yaz(f"  iter {i} | frame {frame.get('id')} | health {hs} | kod {kod} | "
+                f"G1={g1} G3={g3} | {hiz:.2f} kare/s | kodlar={kodlar}")
+
+        i += 1
+        elapsed = time.monotonic() - f_start
+        if elapsed < MIN_FRAME_INTERVAL:
+            time.sleep(MIN_FRAME_INTERVAL - elapsed)
+
+    for fh in (f_frames, f_trans, f_cevap, f_yanit, f_ozet):
+        fh.close()
+
+    dk = (time.perf_counter() - t0) / 60
+    ozet = [
+        "=== TOPLAMA OZETI ===",
+        f"oturum            : {session_name}",
+        f"islenen kare      : {i} / {total}",
+        f"sure              : {dk:.1f} dk",
+        f"sunucu kodlari    : {kodlar}",
+        f"saglikli (h=1)    : {saglikli_say}",
+        f"kesinti (h=0)     : {kesinti_say}",
+        f"cevirisiz (None)  : {cevirisiz_say}",
+        f"toplam reference_prediction gonderimi : {refpred_say}",
+        f"referans sayisi   : {len(refs)}",
+        f"cikti klasoru     : {CIKTI}",
+        "",
+        "Format dogrulama icin:  ..\\.venv\\Scripts\\python format_dogrula.py",
+    ]
+    (CIKTI / "ozet.txt").write_text("\n".join(ozet), encoding="utf-8")
+    for satir in ozet:
+        yaz(satir)
 
 
 if __name__ == "__main__":

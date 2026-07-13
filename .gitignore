@@ -32,9 +32,7 @@ Thumbs.db
 # Proje zip yedekleri
 *.zip
 
-# Toplu test ciktilari
-sistem/test_ciktilari/
-
-# Gercek sunucu toplama ciktilari
+# Gercek sunucu toplama ciktilari (buyuk, yalnizca yerel)
 sistem/sunucu_ciktilari/
+sistem/sunucu_ciktilari_eski/
 havacilikta-yapay-zeka-yarismasi-main/
