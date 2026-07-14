@@ -29,8 +29,9 @@ transformers==5.13.0
 rembg==2.0.76
 onnxruntime==1.27.0
 
-# --- Gorev 2 tema testleri (opsiyonel) ---
-# Mid-Air HDF5 sensor dosyalarini okumak icin (07_tema_dayanikliligi.ipynb).
+# --- Gorev 2 tema testleri (OPSIYONEL, arsivlik) ---
+# Mid-Air HDF5 okuma; ilgili arac (midair_adapter.py) arsive alindi. Runtime GEREKMEZ;
+# yalnizca gorev2 tema-dayaniklilik notebook'unu tekrar kosturacaksan kur.
 h5py==3.16.0
 
 # --- Notebook / gelistirme (opsiyonel; sadece gorev2/notebooks icin) ---

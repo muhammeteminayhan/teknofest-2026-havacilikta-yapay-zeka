@@ -9,8 +9,8 @@ arayüz temel alındı; üç görev buraya bağlandı ve gerçek sunucu bulgular
 ## Çalıştırma
 
 ```powershell
-# 1) Aktif config'i seç (online = gerçek sunucu, simulator = yerel taklit)
-Copy-Item config\.env.online config\.env      # ya da .env.simulator
+# 1) online config'i aktif et (gerçek sunucu)
+Copy-Item config\.env.online config\.env
 
 # 2) sistem/ klasöründen çalıştır
 cd sistem
@@ -70,7 +70,7 @@ sistem/
 ├── main.py                         # ana döngü + RateLimiter(80/dk)
 ├── baglanti_testi.py               # hafif ağ testi (RAFT'sız): login/şema/media/echo tahmin
 ├── format_probe.py                 # tespit payload formatını gerçek sunucuda doğrular
-├── config/  .env (.online/.simulator/example)   # sunucu bilgileri
+├── config/  .env (.online/example)             # sunucu bilgileri
 └── src/
     ├── object_detection_model.py   # ★ üç görevin bağlandığı yer (buraya müdahale edersiniz)
     ├── connection_handler.py       # login/frames/translations/prediction (DEĞİŞTİRMEYİN)

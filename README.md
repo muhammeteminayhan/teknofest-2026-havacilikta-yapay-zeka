@@ -49,7 +49,7 @@ python -m venv .venv
 
 ## Çalıştırma
 ```powershell
-# 1) Hangi sunucu? online = gerçek yarışma, simulator = yerel taklit
+# 1) online config'i aktif et (gerçek yarışma sunucusu)
 Copy-Item sistem\config\.env.online sistem\config\.env
 
 # 2) sistem/ klasöründen başlat
@@ -89,42 +89,31 @@ cd sistem
 **Beklenen:** eşleşme listesi. (Not: örnek referanslar yakın-çekim olduğundan eşleşme
 marjinaldir — `gorev3/README.md`'deki "eşik ayarı" bölümüne bakın.)
 
-### Test 4 — Üç görev birlikte, yerel simülatörle (tam prova, sunucusuz)
-Gerçek sunucuya bağlanmadan tüm boru hattını örnek videoyla koşturur.
-```powershell
-# 1. terminal: yerel simülatörü başlat
-.venv\Scripts\python gorev2\src\simulator.py
-# 2. terminal: arayüzü simülatöre bağla
-Copy-Item sistem\config\.env.simulator sistem\config\.env
-cd sistem
-..\.venv\Scripts\python main.py
-```
-**Beklenen:** kareler işlenir, `_logs/`'ta 201'ler, hata yok.
-
-### Test 5 — Çevrimdışı doğrulama (yarışma günü provası)
-İnternet olmadan tüm modeller önbellekten yüklenmeli. İnterneti kapatın (Wi-Fi off) veya:
+### Test 4 — Çevrimdışı model yükleme (yarışma günü provası)
+İnternet olmadan üç model de önbellekten yüklenmeli. (Yerel simülatör kaldırıldı; tam boru
+hattı doğrulaması artık gerçek test oturumuyla yapılır — Test 1 + Test 5.)
 ```powershell
 $env:HF_HUB_OFFLINE="1"; $env:TRANSFORMERS_OFFLINE="1"
 cd sistem
-..\.venv\Scripts\python main.py     # (simülatör .env ile)
+..\.venv\Scripts\python -c "import sys; sys.path.insert(0,'.'); from src.object_detection_model import ObjectDetectionModel; m=ObjectDetectionModel('http://x/'); print('gorev1:', m.gorev1 is not None, '| gorev3:', m.gorev3 is not None)"
 $env:HF_HUB_OFFLINE=$null; $env:TRANSFORMERS_OFFLINE=$null
 ```
-**Beklenen:** "Gorev 1/3 yuklendi" + kareler işlenir. İnternet gerektirmez.
+**Beklenen:** "On kontrol ... cuda: True", "Gorev 1/3 yuklendi", `gorev1: True | gorev3: True`. İnternet gerektirmez.
 
-### Test 6 — Gerçek sunucuda tam koşu
-Test 1 geçtiyse: `.env.online` ile `python main.py`. `_logs/` içinde 201'leri izleyin.
+### Test 5 — Gerçek sunucuda tam koşu
+Test 1 geçtiyse: `.env.online` ile `cd sistem` → `python main.py`. `_logs/`'ta 201'leri izleyin.
 
 ---
 
 # ✅ Yarışma Günü Kontrol Listesi
 
-- [ ] **Çevrimdışı hazır mı?** Test 5'i çalıştır. Gerekli önbellekler: DINOv3
+- [ ] **Çevrimdışı hazır mı?** Test 4'ü çalıştır. Gerekli önbellekler: DINOv3
       (`~/.cache/huggingface`), RAFT ağırlığı (torchvision cache). *(rembg/u2net **gerekmez** —
       Görev 3 yarışmada rembg kapalı çalışıyor.)* Görev 1 internet istemez.
 - [ ] **`sistem/main.py` başlarken "On kontrol"** satırında `cuda: True`, `raft_agirliklari_yerel: True`
       görünmeli (GPU + RAFT hazır).
 - [ ] **Doğru `.env`** (`.env.online`) kopyalandı mı?
-- [ ] **80/dk gönderim sınırı** — `main.py`'deki RateLimiter açık (aşım → ceza).
+- [ ] **Gönderim hızı** — `main.py`'deki `MIN_FRAME_INTERVAL` (~0,75 s ⇒ ≤80/dk) otomatik yönetir.
 - [ ] **Sunucu günlük sıfırlanır** — her gün taze oturum.
 - [ ] Görev 3 gerçek referanslar gelince eşik ayarı gerekebilir (`gorev3/README.md`).
 

@@ -105,13 +105,16 @@ Sonra kare kare ilerleyen bir çubuk (`Frames: ... / 2250`).
 
 ---
 
-## Yerel test (yarışma öncesi prova, sunucusuz)
+## Çevrimdışı model kontrolü (yarışma öncesi prova)
 
-Gerçek sunucu olmadan Görev 3 entegrasyonunu (yeni akış) yakalanan gerçek kareyle doğrula:
+İnternet olmadan üç modelin de önbellekten yüklendiğini doğrula:
 ```
-..\.venv\Scripts\python suni_test\entegrasyon_testi.py
+$env:HF_HUB_OFFLINE="1"; $env:TRANSFORMERS_OFFLINE="1"
+cd sistem
+..\.venv\Scripts\python -c "import sys; sys.path.insert(0,'.'); from src.object_detection_model import ObjectDetectionModel; m=ObjectDetectionModel('http://x/'); print('gorev1:', m.gorev1 is not None, '| gorev3:', m.gorev3 is not None)"
+$env:HF_HUB_OFFLINE=$null; $env:TRANSFORMERS_OFFLINE=$null
 ```
-**Beklenen:** `YENI ARAYUZ ENTEGRASYONU CALISIYOR` — Görev 1+2+3 ateşlenir, `reference_predictions`
-doğru şemada, pencere dışı temiz.
+**Beklenen:** `cuda: True`, "Gorev 1/3 yuklendi", `gorev1: True | gorev3: True`.
+(Tam boru hattı doğrulaması gerçek test oturumuyla yapılır — Bölüm 2 bağlantı testi + Bölüm 3 koşum.)
 
 Daha fazla ayrıntı: kök [README.md](README.md) ve alt klasör README'leri.
