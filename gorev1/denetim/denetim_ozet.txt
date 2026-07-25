@@ -1,0 +1,14 @@
+=== GOREV 1 KALITE DENETIMI (sahada gonderilen) ===
+log            : bugbuster_5202745_2026_07_16__16_31_13_425661.log
+kare           : 2250
+toplam nesne   : 4213  (kare basi 1.87)
+bos kare       : 605 (%26.9)
+sinif dagilimi : {'UAP': 156, 'Tasit': 3135, 'Insan': 546, 'UAI': 376}
+landing_status : {'1': 505, '-1': 3681, '0': 27}
+moving_status  : {'-1': 1078, '0': 2649, '1': 486}
+kutu alani px2 : min 325 | %25 7992 | medyan 11388 | %75 14280 | maks 123903
+kucuk nesne    : 252 adet <32x32 px (%6.0)
+
+--- sema tutarliligi ---
+Tasit=3135 vs moving(0/1)=3135 -> TUTARLI
+Tasit-disi=1078 vs moving(-1)=1078 -> TUTARLI

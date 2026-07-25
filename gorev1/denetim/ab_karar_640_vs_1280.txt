@@ -1,0 +1,32 @@
+=== GOREV 1 — A/B COZUNURLUK KARARI ===
+test           : 74 kare (6 ardisik blok), uretim yolu (takip dahil)
+karsilastirma  : imgsz=640 (mevcut)  vs  imgsz=1280 (aday)
+
+sinif     imgsz640 imgsz1280    YENI  KAYIP*  yer.deg
+Tasit          218       261      46       3        0
+Insan           50        55      40       7       28
+UAP             12        12       0       0        0
+UAI             12        23      11       0        0
+TOPLAM         292       351      97      10       28
+
+* KAYIP = GERCEK kayip (nesne tamamen kayboldu). Ham kayip 38 idi;
+  bunun 28 tanesi 'yer degistirme' (ayni nesne, kutu kaydi -> IoU<0.5).
+  Minik nesnelerde (Insan) birkac piksellik kayma IoU esigini kirar; bu bir
+  OLCUM ARTEFAKTIDIR, tespit kaybi degildir (gorsel panelde dogrulandi).
+
+bos kare       : 640: 15/74 (%20)  ->  1280: 12/74 (%16)
+YENI kutu alani (medyan): 4896 px2 (70x70)
+GERCEK KAYIP kutu alani (medyan): 1206 px2
+sure           : 148 ms/kare -> 129 ms/kare (+-19 ms | kare butcesi ~2400 ms)
+
+--- olcutler ---
+[OK ] net kazanc: +97 yeni / -10 kayip = +87 tespit
+[OK ] kayip orani: %3.4 (esik %10 — yuksekse aday cozunurluk model dagilimindan sapiyor)
+[OK ] yeni tespit boyutu: medyan 4896 px2 (70x70) — esik 1600 px2 (40x40)
+[OK ] sure butcesi: 129 ms <= 2400 ms
+[OK ] bos kare azaldi mi: 15 -> 12
+
+>>> TAVSIYE: imgsz=1280 ONERILIR
+    Gerekce: +87 net tespit (recall artisi), kayip ihmal edilebilir (%3.4), sure butce icinde (+-19 ms).
+    NOT: Gorsel panelde (ab_*.png) YESIL kutularin gercek nesne oldugu
+         GOZLE dogrulanmalidir; uydurma kutu gorulurse bu tavsiye gecersizdir.

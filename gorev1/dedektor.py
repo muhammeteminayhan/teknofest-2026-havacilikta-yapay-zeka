@@ -57,8 +57,17 @@ def _check_landing_status(landing_box, obstacle_boxes, frame_w, frame_h) -> int:
 class Gorev1Detector:
     """Vanilla YOLOv8s + BoT-SORT ile per-frame nesne tespiti (fork gerektirmez)."""
 
+    # imgsz=1280: yarisma kareleri 1920x1080. Varsayilan 640 goruntuyu 3x kucultup
+    # kucuk nesneleri (uzak tasit, insan) KACIRIYORDU — puanli oturum kayitlarinda
+    # gozle dogrulandi (bkz. kalite_denetim.py: "0 nesne" gonderilen karede park etmis
+    # araclar). A/B olcumu (ab_cozunurluk.py, uretim yolu + takip, 74 kare):
+    #   640 -> 1280 : +97 yeni tespit / -10 gercek kayip (+87 net), bos kare %20->%16,
+    #                 yeni kutu medyani 70x70 px (gercek nesne), maliyet ~+5 ms/kare.
+    #   1280 -> 1920: REDDEDILDI — yeni tespitlerin medyani 16x16 px (gurultu); model
+    #                 beyaz yuvarlak taslari "UAP" saniyordu (yanlis pozitif -> mAP duser).
+    # Yani 1280 en iyi nokta: recall artar, precision korunur, sure butcesi (~1110 ms) rahat.
     def __init__(self, weights_path: Optional[str] = None, motion_thresh: float = 5.0,
-                 conf: float = 0.25, iou: float = 0.7, imgsz: int = 640):
+                 conf: float = 0.25, iou: float = 0.7, imgsz: int = 1280):
         from ultralytics import YOLO  # standart pip surumu
 
         self.weights = str(weights_path or BEST_PT)

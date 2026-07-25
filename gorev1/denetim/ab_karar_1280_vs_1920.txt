@@ -1,0 +1,33 @@
+=== GOREV 1 — A/B COZUNURLUK KARARI ===
+test           : 74 kare (6 ardisik blok), uretim yolu (takip dahil)
+karsilastirma  : imgsz=1280 (mevcut)  vs  imgsz=1920 (aday)
+
+sinif    imgsz1280 imgsz1920    YENI  KAYIP*  yer.deg
+Tasit          261       261       3       3        0
+Insan           55        73      41      19        4
+UAP             12        23      11       0        0
+UAI             23        23       1       1        0
+TOPLAM         351       380      56      23        4
+
+* KAYIP = GERCEK kayip (nesne tamamen kayboldu). Ham kayip 27 idi;
+  bunun 4 tanesi 'yer degistirme' (ayni nesne, kutu kaydi -> IoU<0.5).
+  Minik nesnelerde (Insan) birkac piksellik kayma IoU esigini kirar; bu bir
+  OLCUM ARTEFAKTIDIR, tespit kaybi degildir (gorsel panelde dogrulandi).
+
+bos kare       : 1280: 12/74 (%16)  ->  1920: 10/74 (%14)
+YENI kutu alani (medyan): 262 px2 (16x16)
+GERCEK KAYIP kutu alani (medyan): 400 px2
+sure           : 170 ms/kare -> 163 ms/kare (+-7 ms | kare butcesi ~2400 ms)
+
+--- olcutler ---
+[OK ] net kazanc: +56 yeni / -23 kayip = +33 tespit
+[OK ] kayip orani: %6.6 (esik %10 — yuksekse aday cozunurluk model dagilimindan sapiyor)
+[RED] yeni tespit boyutu: medyan 262 px2 (16x16) — esik 1600 px2 (40x40)
+      ^ UYARI: yeni tespitler GURULTU BOYUTUNDA. Yuksek cozunurlukte model
+        kucuk arka plan desenlerini (tas, leke) nesne sanabilir -> YANLIS POZITIF
+        -> precision duser -> mAP DUSER. Gorsel panelde mutlaka dogrulayin.
+[OK ] sure butcesi: 163 ms <= 2400 ms
+[OK ] bos kare azaldi mi: 12 -> 10
+
+>>> TAVSIYE: imgsz=1280 KALSIN
+    Gerekce: yukaridaki RED olcutlerine bakiniz.
