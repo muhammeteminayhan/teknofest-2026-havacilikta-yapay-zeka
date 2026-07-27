@@ -175,7 +175,7 @@ def _tracker_kur(ad: str, profile, downscale=None):
     if ad == "lk":
         from gorev2_src.matching import FeatureTracker
         return FeatureTracker(profile)
-    if ad in ("xfeat", "splg"):
+    if ad in ("xfeat", "splg", "superpoint"):
         from gorev2_src.derin_eslestirici import tracker_kur
         return tracker_kur(ad, profile)
     raise SystemExit(f"bilinmeyen tracker: {ad}")

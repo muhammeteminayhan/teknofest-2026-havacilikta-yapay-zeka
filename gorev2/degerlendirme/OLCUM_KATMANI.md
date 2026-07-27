@@ -66,6 +66,31 @@ tekrarlayan dokuda seyrek özellik eşleştirmenin bilinen zaafı.
 paketi PyPI'da yayınlanmamış; LightGlue'nun resmi partner çifti DISK kullanıldı.*
 En iyi 6,32 m (RAFT 3,69 m), **0/15** senaryoda daha iyi. XFeat ile aynı kök neden.
 
+**SuperPoint + LightGlue — GERÇEK implementasyon** (resmî [cvg/LightGlue](https://github.com/cvg/LightGlue),
+`pip install git+... --no-deps`). *Yöntem 1'in asıl karşılığı; yukarıdaki DISK ikamesi
+yeterli sayılmadığı için ayrıca kuruldu ve ölçüldü.* Eşleştirme kalitesi iyi görünüyor
+(1266 eşleşme/çift, 56 ms, medyan akış RAFT ile uyumlu) **ama homografi inlier oranı çok
+düşük**: eşik 1,0'da yalnız **%21** (RAFT %83). Sahnedeki 3B yapılar (bina, ağaç) düzlem
+modeline uymuyor ve SuperPoint bu noktaları da eşleştiriyor; RAFT'ın ızgara örneklemesi +
+ileri-geri elemesi ise doğal olarak düzlemsel/zemin noktalarını seçiyor.
+
+Bu yüzden optimum eşik RAFT'takinin **8 katı** çıktı (gevşek eşik = RANSAC'ın doğru modeli
+bulabilmesi için gerekli):
+
+| Eşik | Yarışma | 15 uzun-kesinti | Yön | Ölçek | Inlier |
+|---|---|---|---|---|---|
+| 1,0 | 160,96 m | 184,94 m | 130,0° | %56,2 | 0,21 |
+| 2,0 | 56,20 m | 54,67 m | 62,5° | %15,3 | 0,47 |
+| 3,0 | 7,57 m | 12,71 m | 2,9° | %8,6 | 0,64 |
+| 5,0 | 7,24 m | 13,00 m | 3,7° | %7,5 | 0,81 |
+| **8,0 (en iyi)** | **6,84 m** | **11,25 m** | 2,7° | %5,4 | 0,91 |
+| *RAFT (mevcut)* | *3,77 m* | *6,56 m* | *1,2°* | *%2,1* | *0,83* |
+
+**Sonuç: RAFT 1,8× daha iyi; 0/15 senaryoda SuperPoint kazanmadı.** Güven filtresi
+(`min_skor` 0,5/0,9) inlier'i kayda değer iyileştirmedi (0,24→0,27), yani sorun düşük
+güvenli eşleşmeler değil — **sahne-model uyumsuzluğu**. Hız çok iyiydi (56 ms/kare,
+önbellek üretimi RAFT'ın 4× hızlısı), ama doğruluk yetmedi.
+
 **CoTracker / TAPIR** (yöntem 3) — yüklendi; `cotracker3_online` 8 karelik video penceresi
 bekliyor (`step=8`), ikili `track_pair` arayüzüne durumlu sarmalayıcı gerekir. Üstelik
 **keyframe merdivenimiz (spacing=8) zaten uzun-menzilli keyframe→kare eşleştirmesi yapıyor**

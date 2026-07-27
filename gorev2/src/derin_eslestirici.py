@@ -167,6 +167,68 @@ class DiskLightGlueTracker(_DerinTemel):
         return self._paketle(p0, p1, scale, n_detected=int(len(kp0)))
 
 
+class SuperPointLightGlueTracker(_DerinTemel):
+    """**Resmî** SuperPoint + LightGlue (cvg/LightGlue reposu).
+
+    Kullanıcının yöntem listesindeki "homografi + SuperPoint/LightGlue" hattının asıl
+    karşılığı. (Daha önce kornia'da SuperPoint bulunmadığı için DISK ile ikame edilmişti;
+    bu sınıf gerçek SuperPoint çıkarıcısını kullanır.)
+
+    SuperPoint **gri** girdi ister (1 kanal); `_DerinTemel` RGB verdiği için burada
+    ayrı bir gri hazırlama yolu var. Çalışma ölçeği RAFT ile aynı tutulur (0,5) ki
+    karşılaştırma adil olsun.
+    """
+
+    def __init__(self, profile: Optional[CameraProfile] = None, n_keypoints: int = 2048,
+                 downscale: Optional[float] = None, min_points: int = 12,
+                 min_skor: float = 0.0, device: Optional[str] = None):
+        super().__init__(profile, downscale, min_points)
+        import torch
+        from lightglue import LightGlue, SuperPoint
+
+        self.torch = torch
+        self.min_skor = min_skor      # LightGlue eşleşme güven eşiği (0 = filtre yok)
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.sp = SuperPoint(max_num_keypoints=n_keypoints).eval().to(self.device)
+        self.lg = LightGlue(features="superpoint").eval().to(self.device)
+        logging.info(f"SuperPointLightGlueTracker hazir (n={n_keypoints}, "
+                     f"min_skor={min_skor}, {self.device})")
+
+    def _gri_tensor(self, gray: np.ndarray, scale: float):
+        img = gray if gray.ndim == 2 else cv2.cvtColor(gray, cv2.COLOR_RGB2GRAY)
+        if scale != 1.0:
+            img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        t = self.torch.from_numpy(img).float()[None, None] / 255.0
+        return t.to(self.device)
+
+    def track_pair(self, gray0: np.ndarray, gray1: np.ndarray) -> Optional[MatchResult]:
+        torch = self.torch
+        from lightglue.utils import rbd
+        scale = self._olcek(gray0.shape[1])
+        t0 = self._gri_tensor(gray0, scale)
+        t1 = self._gri_tensor(gray1, scale)
+        try:
+            with torch.no_grad():
+                f0 = self.sp.extract(t0)
+                f1 = self.sp.extract(t1)
+                out = self.lg({"image0": f0, "image1": f1})
+        except Exception as e:
+            logging.warning(f"SuperPoint+LightGlue eslestirme hatasi: {e}")
+            return None
+        f0_, f1_, out_ = (rbd(x) for x in (f0, f1, out))
+        m = out_["matches"]
+        if m is None or len(m) < self.min_points:
+            return None
+        if self.min_skor > 0 and "scores" in out_:
+            tut = out_["scores"] >= self.min_skor
+            m = m[tut]
+            if len(m) < self.min_points:
+                return None
+        p0 = f0_["keypoints"][m[:, 0]].cpu().numpy()
+        p1 = f1_["keypoints"][m[:, 1]].cpu().numpy()
+        return self._paketle(p0, p1, scale, n_detected=int(len(f0_["keypoints"])))
+
+
 def tracker_kur(ad: str, profile: Optional[CameraProfile] = None, **kw):
     """Fabrika: `nokta_onbellek.py` ve ölçüm üreticileri bunu kullanır."""
     ad = ad.lower()
@@ -176,4 +238,6 @@ def tracker_kur(ad: str, profile: Optional[CameraProfile] = None, **kw):
         return XFeatTracker(profile, yildiz=True, **kw)
     if ad in ("splg", "disk", "disklightglue"):
         return DiskLightGlueTracker(profile, **kw)
+    if ad in ("superpoint", "sp_lg", "spliteglue", "splg_gercek"):
+        return SuperPointLightGlueTracker(profile, **kw)
     raise ValueError(f"bilinmeyen derin eslestirici: {ad}")
