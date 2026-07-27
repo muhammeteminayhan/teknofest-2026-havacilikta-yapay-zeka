@@ -100,9 +100,16 @@ class LivePositionEstimator:
             self.engine_used = "lk"
 
         if self.config is None:
-            # kanıta dayalı reçeteler (bkz. defter 04-05)
+            # Kanıta dayalı reçeteler (bkz. defter 04-05 ve gorev2/degerlendirme/).
+            # smooth_alpha=1.0 (ölçüm EMA'sı KAPALI): puanlı oturum sonrası yapılan
+            # taramada (parametre_tarama.py; yarışmanın gerçek kesinti takvimi +
+            # 6 rastgele takvim) hem ortalama hatayı hem en-kötü-durumu düşürdü:
+            #   ortalama Öklid hatası 4,535 → 4,343 m (yarışma takvimi)
+            #                          5,280 → 4,186 m (rastgele takvimler ort., −%21)
+            #   en büyük hata          15,04 → 12,42 m
+            # Yumuşatma, uzun kesintide ölçümü geciktirip sistematik sapma ekliyordu.
             if self.engine_used == "raft":
-                self.config = EstimatorConfig(method="homografi")
+                self.config = EstimatorConfig(method="homografi", smooth_alpha=1.0)
             else:
                 self.config = EstimatorConfig(method="fuzyon")
         self._est = VoLadderEstimator(self.profile, self.config, spacing=self.spacing)

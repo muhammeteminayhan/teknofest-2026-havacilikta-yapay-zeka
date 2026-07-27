@@ -1,0 +1,30 @@
+=== GOREV 2 — LOOP CLOSURE (yer tanima) A/B ===
+temel (KAPALI): yarisma 4.343 m | 4 rastgele ort 4.572 m
+config: homografi, spacing=8, smooth_alpha=1.0
+
+Kabul olcutu: yarisma VE rastgele ortalamasinda >=%1 kazanc, ayrica
+HICBIR kesinti blogunda ortalama hata artmamali (yanlis eslesme koruması).
+
+ min_benz   lowe  alpha    yarisma   rastgele    karar
+     0.70   1.02   0.15     4.366m     4.615m    blok+
+     0.70   1.02   0.30     4.456m     4.806m    blok+
+     0.70   1.02   0.50     4.609m     5.203m    blok+
+     0.70   1.08   0.15     4.351m     4.563m    blok+
+     0.70   1.08   0.30     4.372m     4.570m    blok+
+     0.70   1.08   0.50     4.407m     4.600m    blok+
+     0.80   1.02   0.15     4.365m     4.607m    blok+
+     0.80   1.02   0.30     4.429m     4.784m    blok+
+     0.80   1.02   0.50     4.537m     5.164m    blok+
+     0.80   1.08   0.15     4.350m     4.562m    blok+
+     0.80   1.08   0.30     4.366m     4.567m    blok+
+     0.80   1.08   0.50     4.393m     4.595m    blok+
+     0.88   1.02   0.15     4.346m     4.559m    blok+
+     0.88   1.02   0.30     4.354m     4.561m    blok+
+     0.88   1.02   0.50     4.367m     4.584m    blok+
+     0.88   1.08   0.15     4.344m     4.559m    blok+
+     0.88   1.08   0.30     4.346m     4.558m    blok+
+     0.88   1.08   0.50     4.350m     4.573m    blok+
+
+>>> TAVSIYE: loop closure KAPALI kalsin — hicbir ayar tum kapilardan gecmedi.
+    (yer tanima bu veride guvenilir kazanc saglamiyor; yanlis eslesme riski
+     kazanctan buyuk)

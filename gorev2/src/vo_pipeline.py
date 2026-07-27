@@ -153,6 +153,20 @@ class EstimatorConfig:
     max_step_xy: float = 3.5           # adım başı azami yatay hareket [m] (~26 m/s)
     residual_gate: float = 0.5         # hizalama kabul eşiği (kalan hata oranı)
     smooth_alpha: float = 0.6          # ölçüm EMA katsayısı (1.0 = yumuşatma kapalı)
+    # --- kesintide sürüklenme sönümleme: DENENDİ ve REDDEDİLDİ (varsayılan = kapalı) ---
+    # Teşhis (gorev2/degerlendirme/): kesinti hatası rastgele değil sistematik —
+    # tahmin yörüngesi GT'nin ~2° döndürülmüş, %3–4,5 ölçeklenmiş hâli; bu iki bileşen
+    # bilinseydi hata 6,3 m yerine 1,5 m olurdu. Doğal fikir: `height *= (1-dz_unit)`
+    # ve `psi += yaw` güncellemelerini sönümleyip birikimi yavaşlatmak.
+    # SONUÇ (surukleme_tarama.py): sönümleme hatayı BÜYÜTÜYOR —
+    #   yaw_katsayi=0 → 162,9 m,  height_dz_katsayi=0 → 13,6 m  (temel 4,34 m).
+    # Çünkü araç gerçekten dönüyor ve alçalıyor; güncellemeler doğru ve gereklidir.
+    # Sistematik sapma birikimden değil, ölçümün kendi yanlılığından geliyor.
+    # Parametreler (varsayılanları davranışı DEĞİŞTİRMEZ) ileride yeniden denemek
+    # isteyenler için bırakıldı.
+    height_dz_katsayi: float = 1.0     # 0 = yükseklik kesintide sabit, 1 = mevcut davranış
+    yaw_katsayi: float = 1.0           # 0 = yön kesintide sabit, 1 = mevcut davranış
+    yaw_olu_bant: float = 0.0          # bu değerin altındaki |yaw| gürültü sayılır [rad]
     # NOT: Bir "sim↔hom uyuşmazlık kapısı" denendi ve GERİ ALINDI (defter 07 B).
     # Tez: uyuşmazlık yüksekken ölçüme güvenme, sabit-hıza düş. GT'li zor
     # verilerde (Mid-Air winter/foggy) test edilince kapı tetiklendiği 7 vakanın
@@ -244,7 +258,7 @@ class VoPositionEstimator:
         değişimi kamera yaw'ı ile aynı şey değildir; düzeltme sistematik hata
         ekliyordu.
         """
-        yaw = float(np.mean([a[2] for a in adaylar]))
+        yaw = self._yaw_isle(float(np.mean([a[2] for a in adaylar])))
         psi_eski = self.psi
         self.psi += yaw
         e0_list, dz_list = [], []
@@ -257,6 +271,20 @@ class VoPositionEstimator:
     def _clamp_h(self, h: float) -> float:
         lo, hi = self.cfg.h_bounds
         return float(np.clip(h, lo, hi))
+
+    def _yaw_isle(self, yaw: float) -> float:
+        """Ölü bant + sönümleme uygula (kesintide yön sürüklenmesini sınırlar).
+
+        Varsayılan ayarlarla (olu_bant=0, katsayi=1) davranış değişmez.
+        """
+        if abs(yaw) < self.cfg.yaw_olu_bant:
+            return 0.0
+        return yaw * self.cfg.yaw_katsayi
+
+    def _h_guncelle(self, h: float, dz_unit: float) -> float:
+        """Yükseklik durumunu ilerlet; katsayı 0 ise yükseklik sabit kalır."""
+        k = self.cfg.height_dz_katsayi
+        return self._clamp_h(h * max(1.0 - k * dz_unit, 0.5))
 
     # ---------------- ana döngü ----------------
     def update(
@@ -335,7 +363,7 @@ class VoPositionEstimator:
             if float(np.hypot(*dxy)) <= self.cfg.max_step_xy:   # fizik kapısı
                 dz = self.z_sign * dz_unit * self.height
                 delta = np.array([dxy[0], dxy[1], dz])
-                self.height = self._clamp_h(self.height * max(1.0 - dz_unit, 0.5))
+                self.height = self._h_guncelle(self.height, dz_unit)
                 self._vel = (1 - self.cfg.cv_alpha) * self._vel + self.cfg.cv_alpha * delta
                 self._have_vel = True
         if delta is None:
@@ -415,8 +443,8 @@ class VoLadderEstimator(VoPositionEstimator):
                     if k_ord % self.spacing == 0:     # yeni keyframe: çapayı taşı
                         self._anchor = dict(
                             ord=k_ord, pos=pred.copy(),
-                            h=self._clamp_h(a["h"] * max(1.0 - dz_unit, 0.5)),
-                            psi=a["psi"] + yaw)
+                            h=self._h_guncelle(a["h"], dz_unit),
+                            psi=a["psi"] + self._yaw_isle(yaw))
                     return pred.copy()
         # merdiven kullanılamadı: ardışık sonuçla devam; keyframe sınırındaysa çapayı yine taşı
         if k_ord % self.spacing == 0:

@@ -36,3 +36,8 @@ Thumbs.db
 sistem/sunucu_ciktilari/
 sistem/sunucu_ciktilari_eski/
 havacilikta-yapay-zeka-yarismasi-main/
+
+# Gorev 2 degerlendirme: yeniden uretilebilen buyuk ara ciktilar
+gorev2/outputs/desc_video1.npy
+gorev2/outputs/merdiven_video1_raft_sp*.csv
+gorev2/degerlendirme/*_olcum.csv

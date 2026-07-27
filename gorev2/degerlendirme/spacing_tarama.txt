@@ -1,0 +1,11 @@
+=== GOREV 2 — KEYFRAME ARALIGI (spacing) TARAMASI ===
+config: homografi, smooth_alpha=1.0
+
+ spacing    yarisma   rastgele      karar
+       4     4.439m     4.229m           
+       8     4.343m     4.186m     MEVCUT
+      12     3.936m     4.315m           
+      16     3.375m     4.196m           
+      24     4.585m     5.277m           
+
+>>> TAVSIYE: spacing=8 (mevcut) kalsin — daha iyisi bulunamadi.

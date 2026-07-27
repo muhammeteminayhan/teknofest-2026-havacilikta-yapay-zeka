@@ -1,0 +1,23 @@
+=== GOREV 2 — SISTEMATIK SURUKLENME SONUMLEME ===
+temel (homografi, smooth_alpha=1.0): yarisma 4.343 m | rastgele 4.186 m
+
+Teshis: kesinti hatasi sistematik (yon ~2 derece + olcek %3-4,5).
+Kabul: yarisma VE rastgele ortalamasinda >=%1 kazanc.
+
+ayar                                      yarisma   rastgele    karar
+height_dz_katsayi=0.0                     13.562m    10.478m        -
+height_dz_katsayi=0.25                    10.759m     8.426m        -
+height_dz_katsayi=0.5                      8.112m     6.606m        -
+height_dz_katsayi=0.75                     5.770m     5.095m        -
+height_dz_katsayi=1.0                      4.343m     4.186m   MEVCUT
+yaw_katsayi=0.0                          162.871m    55.450m        -
+yaw_katsayi=0.5                          105.431m    33.114m        -
+yaw_katsayi=0.8                           45.583m    14.848m        -
+yaw_katsayi=1.0                            4.343m     4.186m   MEVCUT
+yaw_olu_bant=0.0                           4.343m     4.186m   MEVCUT
+yaw_olu_bant=0.0005                        4.350m     4.203m        -
+yaw_olu_bant=0.001                         4.338m     4.236m        -
+yaw_olu_bant=0.002                         4.223m     4.235m        -
+yaw_olu_bant=0.005                         4.308m     4.405m        -
+
+>>> SONUC: sonumleme kazanc saglamadi.

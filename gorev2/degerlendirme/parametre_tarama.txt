@@ -1,0 +1,15 @@
+=== GOREV 2 PARAMETRE TARAMASI ===
+temel (homografi): yarisma 4.535 m | 6 rastgele ort 5.280 m
+
+Kabul olcutu: HEM yarisma takviminde HEM rastgele takvimlerin ortalamasinda
+temelden en az %1 daha iyi (tek senaryoya asiri uyumu onler).
+
+--- tek tek kazanan ayarlar ---
+  smooth_alpha         =        1.0   (yarisma 4.343 m, rastgele 4.186 m)
+
+--- BIRLESIK ayar ---
+  yarisma  : 4.343 m  (temel 4.535 m, fark -0.192)
+  rastgele : 4.186 m  (temel 5.280 m, fark -1.094)
+
+>>> TAVSIYE: birlesik ayari UYGULA
+    smooth_alpha=1.0
