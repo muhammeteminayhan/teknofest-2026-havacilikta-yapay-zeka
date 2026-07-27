@@ -90,11 +90,33 @@ class PairMeasurement:
         mr = tracker.track_pair(gray0, gray1)
         if mr is None:
             return m
-        m.n_kept = mr.n_kept
+        return cls.from_points(mr.pts0, mr.pts1, profile, prev_normal=prev_normal,
+                               n_kept=mr.n_kept, taban=m)
+
+    @classmethod
+    def from_points(
+        cls,
+        pts0: np.ndarray,
+        pts1: np.ndarray,
+        profile: CameraProfile,
+        prev_normal: Optional[np.ndarray] = None,
+        n_kept: Optional[int] = None,
+        taban: Optional["PairMeasurement"] = None,
+        **geo_kwargs,
+    ) -> "PairMeasurement":
+        """Hazır nokta eşleşmelerinden ölçüm üret (eşleştirme adımı atlanır).
+
+        `compute()` bunun üstüne kuruludur; ayrıca **nokta önbelleği** ile geometri
+        denemelerini (MAGSAC++ vb.) video yeniden taramadan koşturmayı sağlar.
+        `geo_kwargs` doğrudan `geometry.*` çağrılarına geçer (`robust_method`,
+        `ransac_thresh`, ...).
+        """
+        m = taban if taban is not None else cls()
+        m.n_kept = int(n_kept if n_kept is not None else len(pts0))
 
         f = profile.fx
         pp = (profile.cx, profile.cy)
-        sim = geometry.estimate_similarity(mr.pts0, mr.pts1, ref_point=pp)
+        sim = geometry.estimate_similarity(pts0, pts1, ref_point=pp, **geo_kwargs)
         if sim is not None:
             delta_unit = sim.camera_delta(1.0, f)      # h=1 için
             m.sim_ok = True
@@ -105,7 +127,7 @@ class PairMeasurement:
             m.sim_inlier_ratio = float(sim.inlier_ratio)
 
         hom = geometry.estimate_homography_motion(
-            mr.pts0, mr.pts1, profile.K, prev_normal=prev_normal
+            pts0, pts1, profile.K, prev_normal=prev_normal, **geo_kwargs
         )
         if hom is not None:
             m.hom_ok = True

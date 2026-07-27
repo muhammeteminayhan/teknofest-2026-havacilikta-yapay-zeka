@@ -76,12 +76,20 @@ class SimilarityMotion:
         return -self.angle_rad
 
 
+    # ransac_thresh VARSAYILANI 2.0 -> 1.0 (kanıta dayalı; bkz. degerlendirme/OZET.md)
+    # Kesinti hatası sistematikti (yön ~1,45°, ölçek %3,85). Yeniden-izdüşüm eşiğini
+    # sıkılaştırmak, homografiye giren gevşek eşleşmeleri eleyerek bu yanlılığı düşürdü:
+    #   yön 1,45° -> 1,27°,  ölçek %3,85 -> %2,11
+    #   yarışma takvimi 4,343 -> 3,693 m (-%15)
+    #   15 uzun-kesinti senaryosu 7,628 -> 6,439 m (-%15,6), 11/15 senaryoda daha iyi
+    # (MAGSAC++ / USAC_ACCURATE denendi, her eşikte daha kötü çıktı.)
 def estimate_similarity(
     pts0: np.ndarray,
     pts1: np.ndarray,
     ref_point: Optional[tuple[float, float]] = None,
-    ransac_thresh: float = 2.0,
+    ransac_thresh: float = 1.0,
     min_inliers: int = 15,
+    robust_method: int = cv2.RANSAC,
 ) -> Optional[SimilarityMotion]:
     """RANSAC ile 4 serbestlikli benzerlik hareketi kestir; başarısızsa None.
 
@@ -93,8 +101,14 @@ def estimate_similarity(
     """
     if len(pts0) < min_inliers:
         return None
+    # DIKKAT: estimateAffinePartial2D yalnizca RANSAC ve LMEDS destekler; USAC
+    # aileleri (MAGSAC++ vb.) yalnizca findHomography/findFundamentalMat icin
+    # gecerlidir. Desteklenmeyen bir yontem gelirse sessizce RANSAC'a duseriz —
+    # boylece ayni `robust_method` her iki kestirime de guvenle gecirilebilir.
+    if robust_method not in (cv2.RANSAC, cv2.LMEDS):
+        robust_method = cv2.RANSAC
     M, inl = cv2.estimateAffinePartial2D(
-        pts0, pts1, method=cv2.RANSAC, ransacReprojThreshold=ransac_thresh
+        pts0, pts1, method=robust_method, ransacReprojThreshold=ransac_thresh
     )
     if M is None or inl is None:
         return None
@@ -170,9 +184,10 @@ def estimate_homography_motion(
     pts0: np.ndarray,
     pts1: np.ndarray,
     K: np.ndarray,
-    ransac_thresh: float = 2.0,
+    ransac_thresh: float = 1.0,
     min_inliers: int = 15,
     prev_normal: Optional[np.ndarray] = None,
+    robust_method: int = cv2.RANSAC,
 ) -> Optional[HomographyMotion]:
     """Homografi kestir, ayrıştır ve fiziksel çözümü seç; başarısızsa None.
 
@@ -185,7 +200,7 @@ def estimate_homography_motion(
     """
     if len(pts0) < min_inliers:
         return None
-    H, mask = cv2.findHomography(pts0, pts1, cv2.RANSAC, ransac_thresh)
+    H, mask = cv2.findHomography(pts0, pts1, robust_method, ransac_thresh)
     if H is None or mask is None:
         return None
     mask = mask.reshape(-1).astype(bool)
