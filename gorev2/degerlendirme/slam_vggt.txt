@@ -1,0 +1,12 @@
+=== SLAM/VO DEGERLENDIRME — vggt ===
+kare: 2250 | hizalama: NEDENSEL Sim(3) (yalniz gecmis saglikli kareler)
+
+  yarisma takvimi           : 125.709 m
+  10 uzun-kesinti ort.: 142.983 m  (medyan 150.413)
+  yon hatasi                : 102.08 derece
+  olcek hatasi              : %42.85
+
+  MEVCUT EN IYI (RAFT+homografi): 3.693 m
+  kare basi sure            : 0.07 s (BUTCE ICINDE; sinir 2.4 s)
+
+>>> KAZANAMADI: mevcut sistem (RAFT+homografi) daha iyi

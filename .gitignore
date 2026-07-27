@@ -45,3 +45,4 @@ gorev2/degerlendirme/*_olcum.csv
 # Gorev 2 olcum katmani: nokta onbellekleri (buyuk, yeniden uretilebilir)
 gorev2/outputs/nokta_*.npz
 gorev2/outputs/*.bak
+gorev2/outputs/poz_*.npz

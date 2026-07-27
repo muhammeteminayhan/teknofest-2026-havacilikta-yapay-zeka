@@ -1,0 +1,11 @@
+=== SLAM/VO DEGERLENDIRME — raft_dogrulama ===
+kare: 2250 | hizalama: NEDENSEL Sim(3) (yalniz gecmis saglikli kareler)
+
+  yarisma takvimi           : 3.693 m
+  6 uzun-kesinti ort.: 2.455 m  (medyan 2.696)
+  yon hatasi                : 1.27 derece
+  olcek hatasi              : %2.11
+
+  MEVCUT EN IYI (RAFT+homografi): 3.693 m
+
+>>> KAZANAMADI: mevcut sistem (RAFT+homografi) daha iyi
