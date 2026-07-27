@@ -74,9 +74,11 @@ Tek takvime aşırı uyum olduğu anlaşıldı; **spacing=8 korundu**.
 
 Sistem, geliştirme aşamasında zaten iyi optimize edilmiş; parametre düzeyinde kolay kazanç
 kalmamış. Elde edilen tek gerçek kazanç `smooth_alpha=1.0` (genel senaryolarda −%21).
-Daha büyük sıçrama için **ölçüm katmanının** iyileştirilmesi gerekiyor (daha iyi optik akış /
-doğrudan yükseklik gözlemi / harici sensör), ya da yarışma benzeri (dönüşlü) GT'li veri
-elde edilip loop closure'ın yeniden değerlendirilmesi.
+Daha büyük sıçrama için **ölçüm katmanının** iyileştirilmesi gerekiyor.
+
+> **Devamı:** ölçüm katmanı turu yapıldı (10 yöntem) — bkz. **[OLCUM_KATMANI.md](OLCUM_KATMANI.md)**.
+> Sonuç: yeniden-izdüşüm eşiği 2,0 → 1,0 ile **3,693 m** (bu turun 4,343 m'sinden −%15).
+> **İki turun toplamı: 4,535 → 3,693 m (−%18,6).**
 
 ## Dosyalar
 

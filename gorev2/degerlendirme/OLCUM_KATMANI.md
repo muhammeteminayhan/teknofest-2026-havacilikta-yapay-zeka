@@ -76,6 +76,28 @@ izdüşümü 76×43 m (yarıçap ~22 m). Kesinti karelerinin yalnızca **%30,6's
 kareye bu mesafede (kabul eşiği %40). Mozaik kesinti karelerinin çoğunu kapsayamaz —
 loop closure turundaki bulguyla aynı kök neden (araç yeni alanlara gidiyor).
 
+## Ek deneme: RAFT çalışma çözünürlüğü (ds 0,5 → 0,75)
+
+RAFT görüntüyü 1920 → 960 px'e küçültüp çalışıyor (`auto_scale`). Daha yüksek çözünürlüğün
+(1440 px) akış hassasiyetini artırıp yanlılığı azaltması beklenirdi. Kendi eşik taramasıyla
+denendi (piksel ölçeği değiştiği için eşik de tarandı):
+
+| Ölçek | Eşik | Yarışma | 15 uzun-kesinti | Yön | Ölçek |
+|---|---|---|---|---|---|
+| **0,50 (mevcut)** | **1,0** | **3,693 m** | **6,439 m** | 1,27° | **%2,11** |
+| 0,75 | 0,75 | 3,727 m | 7,917 m | **0,65°** | %2,53 |
+| 0,75 | 1,0 | 3,722 m | 6,606 m | 1,20° | %2,49 |
+| 0,75 | 1,5 / 2,0 | 4,42 / 4,28 m | 8,13 / 8,06 m | ~1,1° | %3,5–3,9 |
+
+**Reddedildi.** Hiçbir varyant mevcut ayarı geçemedi (en iyisi 8/15 senaryoda iyi ama
+ortalamada −1,48 m kötü). İlginç bulgu: yüksek çözünürlük **yön** doğruluğunu belirgin
+artırıyor (1,27° → 0,65°) ama **ölçek** hatasını kötüleştiriyor — ölçek yanlılığının
+kaynağı akış çözünürlüğü değil, muhtemelen düzlemsellik varsayımı ve yükseklik durumu.
+Ayrıca maliyet 2,5× (önbellek üretimi 721 s → 1781 s), gerçek zamanlı bütçeyi zorlar.
+
+*Sonraki tur için ipucu:* yön ve ölçek hataları **farklı kaynaklardan** geliyor; ölçek
+tarafı için homografi düzlem-normali / yükseklik gözlemi hattı incelenmeli.
+
 ## Neden RAFT üstün kaldı
 
 Ölçülen fark seyrek vs yoğun eşleştirmede: RAFT **yoğun optik akış + ileri-geri (cycle)
