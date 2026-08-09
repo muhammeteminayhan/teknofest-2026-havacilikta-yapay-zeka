@@ -1,6 +1,6 @@
 """Görev 1 — Nesne Tespiti: durumlu (stateful) per-frame dedektör.
 
-Arkadaşın eğittiği **vanilla YOLOv8s** modeli (`agirliklar/best.pt`) ile taşıt,
+Kendi eğittiğimiz **DINOv3 gövdeli YOLO** modeli (`agirliklar/best.pt`) ile taşıt,
 insan ve iniş alanı (UAP / UAİ) tespiti. `model.track` (BoT-SORT) ile takip,
 ego-hareket telafili taşıt hareket durumu ve iniş uygunluğu üretilir.
 
@@ -17,12 +17,33 @@ Sınıf uzlaşımı (model ↔ şartname):
 from __future__ import annotations
 
 import logging
+import sys
+from pathlib import Path
 from typing import Optional
 
 import cv2
 import numpy as np
 
 from . import BEST_PT
+
+
+def _dinov3_enjekte() -> None:
+    """DINOv3 gövdeli ağırlığı **kurulu** ultralytics ile yüklenebilir kıl.
+
+    Ağırlık `ultralytics.nn.modules.dinov3.DINOv3` sınıfına pickle bağımlıdır; bu modül
+    yalnız DINOV3-YOLO fork'unda (8.4.80) bulunur. Fork'u kurmak kurulu sürümü
+    (8.4.92) geriye alır ve Görev 3'ü de riske atardı. Bunun yerine modülün proje
+    içindeki kopyası `sys.modules`'e enjekte edilir — pickle sınıfı bulur, kurulu
+    ultralytics hiç değişmez. Ölçüldü: bu yolla model fork olmadan yükleniyor.
+    """
+    ad = "ultralytics.nn.modules.dinov3"
+    if ad in sys.modules:
+        return
+    from . import dinov3_modul
+    sys.modules[ad] = dinov3_modul
+    import ultralytics.nn.modules as _M
+    import ultralytics.nn.tasks as _T
+    _M.DINOv3 = _T.DINOv3 = dinov3_modul.DINOv3
 
 
 def _calculate_homography(prev_frame: np.ndarray, curr_frame: np.ndarray) -> np.ndarray:
@@ -55,22 +76,26 @@ def _check_landing_status(landing_box, obstacle_boxes, frame_w, frame_h) -> int:
 
 
 class Gorev1Detector:
-    """Vanilla YOLOv8s + BoT-SORT ile per-frame nesne tespiti (fork gerektirmez)."""
+    """DINOv3 gövdeli YOLO + BoT-SORT ile per-frame nesne tespiti (fork gerektirmez).
 
-    # imgsz=1280: yarisma kareleri 1920x1080. Varsayilan 640 goruntuyu 3x kucultup
-    # kucuk nesneleri (uzak tasit, insan) KACIRIYORDU — puanli oturum kayitlarinda
-    # gozle dogrulandi (bkz. kalite_denetim.py: "0 nesne" gonderilen karede park etmis
-    # araclar). A/B olcumu (ab_cozunurluk.py, uretim yolu + takip, 74 kare):
-    #   640 -> 1280 : +97 yeni tespit / -10 gercek kayip (+87 net), bos kare %20->%16,
-    #                 yeni kutu medyani 70x70 px (gercek nesne), maliyet ~+5 ms/kare.
-    #   1280 -> 1920: REDDEDILDI — yeni tespitlerin medyani 16x16 px (gurultu); model
-    #                 beyaz yuvarlak taslari "UAP" saniyordu (yanlis pozitif -> mAP duser).
-    # Yani 1280 en iyi nokta: recall artar, precision korunur, sure butcesi (~1110 ms) rahat.
+    Tespit katmanı dışındaki her şey önceki vanilla YOLOv8s kurulumundan aynen devralındı:
+    ego-hareket telafili hareket durumu, iniş uygunluğu, takip, UAP/UAİ sınıf takası.
+    """
+
+    # imgsz=640: DINOv3 gövdeli model 640'ta EGITILDI (checkpoint train_args) ve ViT
+    # tabanli govdeler egitim cozunurlugunden uzaklasinca bozulur. A/B ile dogrulandi
+    # (ab_model.py, 74 gercek yarisma karesi, ayni uretim yolu):
+    #   640  : net +86 yalniz-aday / -36 gercek kayip, bos kare 15 -> 12
+    #   1280 : net +40 / -56 — belirgin daha kotu
+    # (Onceki vanilla YOLOv8s icin 1280 en iyiydi: +97/-10. Model degisince optimum da
+    #  degisti; eski gerekce artik gecerli degil.)
     def __init__(self, weights_path: Optional[str] = None, motion_thresh: float = 5.0,
-                 conf: float = 0.25, iou: float = 0.7, imgsz: int = 1280):
-        from ultralytics import YOLO  # standart pip surumu
+                 conf: float = 0.25, iou: float = 0.7, imgsz: int = 640):
+        from ultralytics import YOLO  # standart pip surumu (fork DEGIL)
 
         self.weights = str(weights_path or BEST_PT)
+        if "dinov3" in Path(self.weights).name.lower():
+            _dinov3_enjekte()
         self.model = YOLO(self.weights)
         self.motion_thresh = motion_thresh
         self.conf, self.iou, self.imgsz = conf, iou, imgsz

@@ -1,5 +1,12 @@
 # Görev 2 — ölçüm katmanı turu: 10 yöntemin değerlendirmesi
 
+> **Not (29 Tem 2026):** bu rapordaki bütün sayılar **yalnız örnek veri setinde**
+> ölçüldü. Sonraki tur düşey kanalı değiştirip 2,795 m'ye indi, ama o kazanç puanlı
+> oturumun kendi karelerinde **yeniden üretilemedi** ve değişiklik geri alındı —
+> bkz. [DUSEY_KANAL.md](DUSEY_KANAL.md). Aşağıdaki bulgular tarihsel kayıttır;
+> herhangi biri yeniden uygulanacaksa önce [`genelleme_sinavi.py`](../genelleme_sinavi.py)
+> kapısından geçmelidir.
+
 **Bağlam.** PK (Görev 2) puanlı oturumda 55,29 / 8 takım içinde 8. — genel puanın **%40'ı**
 (final formülü 8/8 takımda doğrulandı: `Final = (NT·0,25 + RNT·0,25 + PK·0,40) / 0,90`).
 Önceki tur parametre düzeyinde tüketilmişti; teşhis **ölçüm katmanının yanlılığını**

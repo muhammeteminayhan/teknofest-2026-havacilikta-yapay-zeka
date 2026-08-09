@@ -75,7 +75,7 @@ class ObjectDetectionModel:
         self._last_frame_url = None
         self._last_trans = None  # (x, y, z) float
 
-        # Gorev 1 tespit modeli (vanilla YOLOv8s). Yuklenemezse Gorev 2 yine calisir.
+        # Gorev 1 tespit modeli (DINOv3 govdeli YOLO). Yuklenemezse Gorev 2 yine calisir.
         self.gorev1 = None
         try:
             from gorev1 import Gorev1Detector

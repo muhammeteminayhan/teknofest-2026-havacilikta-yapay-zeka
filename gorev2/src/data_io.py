@@ -33,6 +33,10 @@ def load_translations(csv_path: str | Path) -> pd.DataFrame:
     df["frame_idx"] = (
         df["frame_numbers"].str.replace("frame_", "", regex=False).astype(int)
     )
+    if "translation_z" not in df.columns:
+        # 2024 veri setinde GT yalnizca x-y iceriyor; z sifirlanir ve o yatakta
+        # hata 2B olculur (bkz. nokta_onbellek.YATAKLAR["v24"]).
+        df["translation_z"] = 0.0
     return df[["frame_idx", "translation_x", "translation_y", "translation_z"]]
 
 
@@ -74,6 +78,47 @@ def read_frame(video_path: str | Path, frame_idx: int, gray: bool = False) -> np
     if gray:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     return frame
+
+
+def iter_image_frames(
+    image_dir: str | Path,
+    pattern: str = "frame_*.webp",
+    gray: bool = True,
+    stop: Optional[int] = None,
+    progress: bool = False,
+) -> Iterator[tuple[int, np.ndarray]]:
+    """Kare *dizininden* sıralı okuma (yarışma sunucusundan inen kareler).
+
+    Videodan farkı: bu kareler **zaten yarışma temposunda** (7,5 FPS) gelir,
+    altörnekleme yapılmaz. ``(ordinal, frame)`` ikilileri üretir.
+
+    Okuma yolu ``cv2.imread`` + gri çevrim ile ``LivePositionEstimator``in
+    yaptığının birebir aynısıdır — önbellekli koşunun canlı koşuyla aynı
+    sonucu vermesi buna bağlıdır.
+    """
+    yollar = sorted(Path(image_dir).glob(pattern))
+    if stop is not None:
+        yollar = yollar[:stop]
+
+    pbar = None
+    if progress:
+        from tqdm import tqdm
+
+        pbar = tqdm(total=len(yollar), desc=Path(str(image_dir)).name,
+                    unit="kare", mininterval=5)
+    try:
+        for i, yol in enumerate(yollar):
+            img = cv2.imread(str(yol))
+            if img is None:
+                break
+            if gray and img.ndim == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            yield i, img
+            if pbar is not None:
+                pbar.update(1)
+    finally:
+        if pbar is not None:
+            pbar.close()
 
 
 def iter_competition_frames(

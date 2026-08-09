@@ -86,6 +86,34 @@ aşınca sistem belleğine paging başlıyor ve **40× yavaşlıyor**:
 | **RAFT + homografi (mevcut)** | **3,693 m** | 1,27° | %2,11 | ~0,6 | **korunuyor** |
 | VGGT (294 px, parça+Sim(3)) | 125,7 m | 102° | %42,9 | **0,07** | ❌ zincirleme çözülmeden kullanılamaz |
 | DPVO | — | — | — | — | ❌ çalışma zamanı çökmesi |
+| **ORB-SLAM (tracking çekirdeği)** | **90,6 m** | 36,5° | %68 | **0,05** | ❌ ölçek mekanizması bu sahneyle uyumsuz |
+
+### ORB-SLAM — sonradan denendi (düşey kanal turunun ardından)
+
+Bu turda "en zor kalem" diye ertelenmişti; sonradan ölçüldü. **Hazır binding yolu kapalı:**
+PyPI'daki `orbslam3` wheel'i bir Linux `.so`'sudur (Windows'ta yüklenmez) ve ayrıca
+Pangolin/DBoW2/g2o'ya dinamik bağımlıdır. Kaldı ki ORB-SLAM3'ün ayırt edici parçaları
+olan **loop closure ve global bundle adjustment rolling akışta zaten kullanılamaz** —
+gönderilen tahmin geri alınamadığı için geriye dönük düzeltme puana yansımaz.
+
+Yarışmada işlevi olan kısım **tracking** çekirdeğidir; OpenCV ile kurulup (ORB + Lowe
+oran testi + ORB-SLAM'in kendi H/F model seçimi + triangulation + PnP + keyframe yönetimi)
+dört varyant ölçüldü:
+
+| Varyant | Yarışma | Neden |
+|---|---|---|
+| 1. temel | 104,8 m | takip %80 çöküyor (keyframe güncellenmeyince kısır döngü) |
+| 2. + motion model + keyframe kurtarma | **90,6 m** | takip %99,5 — en iyi ORB varyantı |
+| 3. + ORB-SLAM'in gerçek H/F puanlaması + ölçek koruma | 4947 m | triangulation dejenere → yörünge 4,6×10⁸'e patladı |
+| 4. haritasız saf düzlemsel zincir | 116,7 m | ölçek her keyframe'de birim `\|t\|`'ye sıfırlanıyor |
+
+**Kök neden (varyantlar arasında tutarlı):** monoküler ORB-SLAM ölçeği *triangulation*
+ile taşır. Nadir bakan kamerada sahne neredeyse saf düzlemdir ve baseline küçüktür —
+derinlik kestirimi kötü koşulludur. İlginç bir doğrulama: varyant 3'te model seçimi
+düzeltilince sistem sahneyi doğru teşhis etti (H=3, F=0 — yani "bu sahne düzlemsel"),
+ama tam da bu yüzden triangulation çöktü. Bizim hattımız ölçeği *GT'den* öğrenip
+(sağlıklı dönemde Procrustes) düzlemsel homografi + yükseklik ile taşıdığı için aynı
+sahnede sorun yaşamıyor. Deneme dosyaları kaldırıldı; bu kayıt yeterlidir.
 
 ### DPVO — derlendi ama çalışmıyor
 

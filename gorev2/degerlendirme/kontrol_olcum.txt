@@ -1,0 +1,20 @@
+=== GOREV 2 OLCUM — kontrol ===
+veri   : ornek veri seti video 1 (tam GT), 2250 kare
+takvim : yarismanin GERCEK kesinti yapisi (703 saglikli / 1547 kesinti)
+config : yontem=homografi, spacing=8
+
+>>> RESMI METRIK (sartname Denklem 2 = PK puanini belirleyen deger) <<<
+  ortalama Oklid hatasi (TUM kareler) : 3.832 m
+  yalniz kesinti karelerinde          : 5.574 m
+
+kiyas tabanlari (gorsel bilgi YOK):
+  'tut'       (son saglikli konumu tut) : 63.645 m
+  'sabit_hiz' (son hizla duz devam)     : 160.690 m
+
+--- kesinti bloklari (tani) ---
+            blok  uzunluk   ort hata     bitis      maks   m/kare
+   451-899            449      7.62m     9.99m     9.99m   0.0222
+  1051-1549           499      4.84m    11.81m    11.81m   0.0237
+  1651-2249           599      4.65m    11.04m    11.04m   0.0184
+
+hata persentilleri (tum kareler): medyan 3.33 | %90 9.45 | maks 11.81 m

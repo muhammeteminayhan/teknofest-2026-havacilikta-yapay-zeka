@@ -1,0 +1,17 @@
+=== GOREV 3 — TEST YATAGI (aug) ===
+kaynak: THYZ_2026_Online_Yarisma | 7 referans (resmi frame_start/end araliklari)
+olcut: recall = aktif karelerin kacinda tespit var; aralik disi = nesne YOKKEN uretilen tespit
+
+ ref        aralik   kare  tespit   recall  alan medyan  sicrama px   disi
+   1         10-70     12      12     100%        36400         0.0    1/2
+   2        83-200     12       7      58%        82902         0.0    1/2
+   3      895-1025     12       9      75%       154732         0.0    2/2
+   4     1050-1200     12       9      75%        29405         0.0    1/2
+   5     1330-1453     12      12     100%        86622         0.0    2/2
+   6     1675-1714     12      12     100%       226411        38.6    2/2
+   7     1900-1960     12      12     100%       161322         0.0    0/2
+
+TOPLAM recall: 73/84 = %86.9
+ARALIK DISI tespit: 9/14 kare (dusuk olmali — nesne sahnede yok)
+kutu alani medyan: 82620 px2 (287x287)
+sure: 1099 ms/kare (p95 1141)

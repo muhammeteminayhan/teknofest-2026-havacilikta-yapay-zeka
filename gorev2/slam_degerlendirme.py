@@ -47,7 +47,13 @@ GT_CSV = ROOT / "THYZ_2026_Ornek_Veri_Seti" / "THYZ_2026_Ornek_Veri_1_translatio
 KESINTI = [(451, 900), (1051, 1550), (1651, 2250)]
 N_KARE = 2250
 KARE_BUTCE_S = 2.4        # 90 dk / 2250 kare
-MEVCUT_EN_IYI = 3.693     # RAFT + homografi + smooth_alpha=1.0 + esik 1.0
+# RAFT + homografi + smooth_alpha=1.0 + esik 1.0 (dusey kanal GERI ALINDI, bkz.
+# degerlendirme/DUSEY_KANAL.md). OLCUM YOLU: canli sistem (`canli_dogrulama.py`,
+# gercek video, onbelleksiz), ORNEK VERI SETI uzerinde.
+# UYARI: bu esik yalniz ornek veri setinde gecerlidir. Bir SLAM adayi bu esigi gecse
+# bile, uygulanmadan once `genelleme_sinavi.py` ile puanli oturumun kendi karelerinde
+# de kazanmalidir — tek ucusta olculen kazanc genellemiyor (dusey kanal ornegi).
+MEVCUT_EN_IYI = 3.757
 
 
 def takvim(n=N_KARE):

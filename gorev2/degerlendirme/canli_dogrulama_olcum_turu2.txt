@@ -1,0 +1,14 @@
+=== GOREV 2 — CANLI SISTEM DOGRULAMASI (olcum_turu2) ===
+video: THYZ_2026_Ornek_Veri_1.MP4 | 2256 kare | motor=raft | yontem=homografi | smooth_alpha=0.6
+
+ORTALAMA OKLID HATASI (resmi metrik, tum kareler): 4.364 m
+  kesinti karelerinde: 6.364 m | saglikli: 0.0000 m
+  eksen RMS (kesinti): x 2.825 | y 5.005 | z 4.349 m
+
+  blok1 (449 kare): ort  7.773 m | bitis  9.380 m
+  blok2 (499 kare): ort  6.257 m | bitis 13.603 m
+  blok3 (599 kare): ort  5.396 m | bitis 13.946 m
+
+HIZ: kare basi ort 843 ms | p95 1098 ms
+  toplam koşu 32.1 dk (2256 kare)
+  yarismada beklenen: ~32 dk (yalniz Gorev 2) — gecen oturum uc gorevle 46 dk, pencere 90 dk

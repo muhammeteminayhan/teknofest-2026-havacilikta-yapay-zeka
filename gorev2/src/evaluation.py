@@ -90,9 +90,32 @@ def build_measurements(
 
 
 def _meas_from_row(row) -> PairMeasurement:
-    alanlar = {k: row[k] for k in PairMeasurement.__dataclass_fields__}
-    for b in ("ok", "frozen", "sim_ok", "hom_ok"):
-        alanlar[b] = bool(alanlar[b])
+    """CSV/DataFrame satırından ölçüm kur — **eksik sütunlara dayanıklı**.
+
+    Neden: ölçüm önbellekleri (``outputs/olcumler_*.csv``) bir kez üretilip aylarca
+    yeniden kullanılıyor. `PairMeasurement`'a sonradan alan eklendiğinde eski
+    önbelleklerde o sütun yoktur; alanları doğrudan satırdan okumak `KeyError`
+    veriyordu ve CSV yolunu kullanan bütün araçları kırıyordu (`test_yatagi.py`,
+    `parametre_tarama.py`, `spacing_tarama.py`, `surukleme_tarama.py`,
+    `loop_closure_test.py`). Artık **dataclass varsayılanlarından** kurulup yalnız
+    mevcut sütunlar üzerine bindiriliyor; böylece ileride eklenecek her alan
+    kendiliğinden geriye uyumlu olur.
+
+    Tuzak: tamamı boş bir sütun pandas'ta float64/NaN okunur ve ``bool(nan) is True``.
+    Bu yüzden bool alanlar yalnız **sonlu** bir değer varsa dönüştürülür; yoksa
+    dataclass varsayılanı korunur.
+    """
+    BOOL_ALANLAR = ("ok", "frozen", "sim_ok", "hom_ok")
+    alanlar = {}
+    for ad, alan in PairMeasurement.__dataclass_fields__.items():
+        if ad not in row:
+            continue                      # varsayılanına bırak
+        deger = row[ad]
+        if ad in BOOL_ALANLAR:
+            if isinstance(deger, float) and not np.isfinite(deger):
+                continue                  # NaN -> varsayılan (bool(nan) True olurdu)
+            deger = bool(deger)
+        alanlar[ad] = deger
     return PairMeasurement(**alanlar)
 
 

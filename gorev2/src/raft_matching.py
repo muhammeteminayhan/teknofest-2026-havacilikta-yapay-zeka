@@ -43,7 +43,10 @@ class RaftTracker:
         model_size: str = "large",       # "large" | "small"
         device: Optional[str] = None,
         downscale: Optional[float] = None,  # None -> genişliğe göre otomatik (hedef ~1000 px)
-        grid_step: int = 28,             # örnekleme grid aralığı (işlenen çözünürlükte)
+        grid_step: Optional[int] = 28,   # örnekleme grid aralığı; None -> hedef nokta sayısına göre
+        hedef_nokta: int = 640,          # grid_step=None iken hedeflenen örnek sayısı
+        on_isle: Optional[str] = None,   # None | "clahe" (termal için)
+        clahe_clip: float = 2.0,
         margin: int = 16,                # kenar payı (padding bölgesinden uzak dur)
         fb_check: bool = True,           # ileri-geri (cycle) tutarlılık elemesi
         fb_threshold: float = 1.5,       # [px], işlenen çözünürlükte
@@ -59,6 +62,10 @@ class RaftTracker:
         self.profile = profile
         self.downscale = None if downscale is None else float(downscale)
         self.grid_step = grid_step
+        self.hedef_nokta = hedef_nokta
+        self.on_isle = on_isle
+        self._clahe = (cv2.createCLAHE(clipLimit=clahe_clip, tileGridSize=(8, 8))
+                       if on_isle == "clahe" else None)
         self.margin = margin
         self.fb_check = fb_check
         self.fb_threshold = fb_threshold
@@ -90,6 +97,33 @@ class RaftTracker:
     def _effective_scale(self, width: int) -> float:
         return self.downscale if self.downscale is not None else self.auto_scale(width)
 
+    def _izgara_adimi(self, h: int, w: int) -> int:
+        """Örnekleme aralığı: sabit ``grid_step`` ya da hedef nokta sayısına göre.
+
+        Sabit 28 px, işlenen çözünürlük değiştiğinde nokta sayısını da değiştirir:
+        1080p (960×540 işlenir) → ~646 nokta, ama termal (640×512, ölçek 1,0)
+        → ~357 nokta. Homografi gürültüsü nokta sayısıyla düştüğü için termal
+        ölçüm bu yüzden yapısal olarak daha gürültülü. Hedef sayıya kilitlemek
+        modaliteler arası davranışı eşitler.
+        """
+        if self.grid_step is not None:
+            return self.grid_step
+        alan = max((h - 2 * self.margin) * (w - 2 * self.margin), 1)
+        return int(np.clip(round(np.sqrt(alan / max(self.hedef_nokta, 1))), 8, 40))
+
+    def _onisle(self, gray: np.ndarray) -> np.ndarray:
+        """Termal için ön-işleme: FPN bastırma + yerel kontrast sabitleme.
+
+        Termal (LWIR) kareler mikrobolometre sabit-desen gürültüsü (FPN) taşır ve
+        kamera AGC'si sahne sıcaklık aralığına göre parlaklık/kontrastı kare kare
+        yeniden ölçekler; bu, optik akış için görünürlük kaymasıdır. Literatürdeki
+        standart karşı önlem 3×3 Gauss (σ=1) ile FPN'i bastırıp CLAHE ile yerel
+        kontrastı sabitlemektir (bkz. arXiv 2603.02114 termal-ataletsel odometri).
+        """
+        if self._clahe is None:
+            return gray
+        return self._clahe.apply(cv2.GaussianBlur(gray, (3, 3), 1.0))
+
     def _prepare(self, gray: np.ndarray, scale: float = None):
         """Gri kareyi RAFT girdisine çevir: ölçekle, 8'in katına doldur, normalize et."""
         img = gray
@@ -119,13 +153,14 @@ class RaftTracker:
     # ------------------------------------------------------------------
     def track_pair(self, gray0: np.ndarray, gray1: np.ndarray) -> Optional[MatchResult]:
         scale = self._effective_scale(gray0.shape[1])
-        t0, (h, w) = self._prepare(gray0, scale)
-        t1, _ = self._prepare(gray1, scale)
+        t0, (h, w) = self._prepare(self._onisle(gray0), scale)
+        t1, _ = self._prepare(self._onisle(gray1), scale)
 
         flow_f = self._flow(t0, t1)
         # örnekleme grid'i (geçerli bölge içinde, kenarlardan uzak)
-        xs = np.arange(self.margin, w - self.margin, self.grid_step)
-        ys = np.arange(self.margin, h - self.margin, self.grid_step)
+        adim = self._izgara_adimi(h, w)
+        xs = np.arange(self.margin, w - self.margin, adim)
+        ys = np.arange(self.margin, h - self.margin, adim)
         gx, gy = np.meshgrid(xs, ys)
         gx, gy = gx.ravel(), gy.ravel()
         n_detected = len(gx)

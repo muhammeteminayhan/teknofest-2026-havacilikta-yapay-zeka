@@ -6,11 +6,15 @@ makinesi (``VoLadderEstimator``) beslenir. Böylece provada ölçtüğümüz
 davranış ile yarışma günü davranışı arasında kod farkı kalmaz.
 
 Motor seçimi:
-* ``engine="auto"`` → önce RAFT denenir (GPU + önceden inmiş ağırlık gerekir);
-  başarısız olursa **kendiliğinden LK yedeğine düşer** ve bunu loglar.
-* RAFT'ta birincil reçete: homografi + keyframe merdiveni (8 adım).
-* LK'de merdiven kapatılır (kanıtlandı: LK uzun taban çizgisinde zayıf) ve
-  füzyon yöntemi kullanılır.
+* ``engine="auto"`` → **RAFT → SIFT → LK** sırasıyla denenir; her düşüş loglanır.
+* ``engine="sift"`` / ``"lk"`` → doğrudan o motor (yedek zincirine düşülmez).
+* Reçete: RAFT ve SIFT'te homografi + keyframe merdiveni (8 adım).
+  Yalnız son-çare LK yolunda eski füzyon/merdivensiz reçete korunur.
+
+CPU yedeği neden SIFT (eskiden LK) — üç yatakta ortalama hata ölçüldü:
+LK füzyon+merdivensiz 15,86 m · LK homografi+merdiven 12,36 m ·
+**SIFT homografi+merdiven 9,21 m** · (kıyas) RAFT/GPU 9,72 m.
+Ayrıntı: ``degerlendirme/KLASIK_ESLESTIRICI.md``.
 """
 from __future__ import annotations
 
@@ -95,23 +99,80 @@ class LivePositionEstimator:
             except Exception as e:
                 logging.warning(f"RAFT kurulamadi ({e}); LK yedegine geciliyor")
                 self._tracker = None
-        if self._tracker is None:
+        if self._tracker is None and motor == "lk":
+            # açık istek: doğrudan LK (yedek zincirine düşülmez)
             self._tracker = FeatureTracker(self.profile)
             self.engine_used = "lk"
 
+        if self._tracker is None:
+            # CPU YEDEĞİ: SIFT (eskiden LK). Ölçüldü — üç yatakta ortalama hata:
+            #   LK, füzyon + merdiven KAPALI (eski yedek) : 15,86 m
+            #   LK, homografi + merdiven                  : 12,36 m
+            #   SIFT, homografi + merdiven                :  9,21 m  <-- secildi
+            #   (kıyas) RAFT/GPU                          :  9,72 m
+            # SIFT 3 yatağın 2'sinde en iyi, hiçbirinde felaket yok; GPU'lu RAFT'a
+            # çok yakın. Maliyet ~214 ms/çift (CPU), 1,6 s/kare bütçesinin altında.
+            # Ayrıntı: degerlendirme/KLASIK_ESLESTIRICI.md
+            try:
+                from .klasik_eslestirici import KlasikTracker
+
+                self._tracker = KlasikTracker(self.profile, yontem="sift")
+                self._tracker.track_pair(gray[::4, ::4], gray[::4, ::4])
+                self.engine_used = "sift"
+            except Exception as e:
+                logging.warning(f"SIFT kurulamadi ({e}); LK yedegine geciliyor")
+                self._tracker = FeatureTracker(self.profile)
+                self.engine_used = "lk"
+
         if self.config is None:
-            # Kanıta dayalı reçeteler (bkz. defter 04-05 ve gorev2/degerlendirme/).
-            # smooth_alpha=1.0 (ölçüm EMA'sı KAPALI): puanlı oturum sonrası yapılan
-            # taramada (parametre_tarama.py; yarışmanın gerçek kesinti takvimi +
-            # 6 rastgele takvim) hem ortalama hatayı hem en-kötü-durumu düşürdü:
-            #   ortalama Öklid hatası 4,535 → 4,343 m (yarışma takvimi)
-            #                          5,280 → 4,186 m (rastgele takvimler ort., −%21)
-            #   en büyük hata          15,04 → 12,42 m
-            # Yumuşatma, uzun kesintide ölçümü geciktirip sistematik sapma ekliyordu.
-            if self.engine_used == "raft":
-                self.config = EstimatorConfig(method="homografi", smooth_alpha=1.0)
-            else:
-                self.config = EstimatorConfig(method="fuzyon")
+            # TESLIM EDILEN REÇETE = puanlı oturumda (16 Tem 2026) koşan reçetenin
+            # kendisi: RAFT + düzlemsel homografi + keyframe merdiveni (spacing=8),
+            # EstimatorConfig varsayılanlarıyla (smooth_alpha=0.6).
+            #
+            # Puanlı oturum sonrası iki değişiklik denendi; ikisi de yarışmanın KENDİ
+            # uçuşunda ölçülünce geri alındı (gorev2/degerlendirme/DUSEY_KANAL.md):
+            #
+            #  1) `z_sim_agirlik=1.0` — düşey hareketi benzerlik ölçeğinden almak.
+            #     Örnek veri setinde 3,767 → 2,803 m (−%25,6); puanlı oturumun
+            #     kareleriyle yapılan genelleme sınavında iki pencerede de KAYBETTİ
+            #     (16,04 → 20,07 m ve 18,46 → 18,62 m; zarar tamamen z ekseninde).
+            #
+            #  2) `smooth_alpha=1.0` — ölçüm EMA'sını kapatmak. Örnek veri setinde
+            #     kazançlıydı (4,535 → 4,343 m; rastgele takvimlerde −%21); ancak
+            #     genelleme sınavında iki pencere ters yönde ve ortalamada 0.6 önde
+            #     (16,71 vs 17,25 m). Ayar verisi = test oturumu videosu olduğundan
+            #     o kanıt bu uçuş için bağlayıcı değil; oturumda koşan değere dönüldü.
+            #     (Ölçüm turu 2'de üç uçuşta yeniden tarandı: 1.0 net kötü — sınav −0,05,
+            #     video1 −0,14 ama termal +1,15. `0.6` artık istatistiksel olarak doğrulandı.)
+            #
+            # ÖLÇÜM TURU 2 (7 Ağu 2026) — UYGULANAN DEĞİŞİKLİK:
+            #   `min_inlier_ratio` 0,40 → **0,05** + yeniden-izdüşüm eşiği kameraya göre
+            #   normalize (`calibration.ransac_esigi`, 0,5 çalışma pikseli).
+            #   Eski kapı ölçümlerin %30–61'ini atıp sistemi sabit-hız yedeğine düşürüyordu.
+            #   Üç bağımsız uçuşta da kazandı (8 permütasyon, eşleştirilmiş):
+            #     sınav 16,98 → 10,92 · video1-RGB 3,87 → 3,60 · video2-termal 15,24 → 10,49
+            #
+            #
+            # YÖNTEM SINAVI (7 Ağu 2026) — yukarıdaki tur 2024/2025 verisinde sınandı
+            # ve KISMEN GERİ ALINDI (degerlendirme/YONTEM_SINAVI.md):
+            #   * `min_inlier_ratio` 0,05 -> **0,30** (0,05 yıllar arası aşırı uyumdu)
+            #   * merdiven GNC'si ve kameraya göre normalize eşik KALDIRILDI
+            #     (GNC 2025-RGB-4K-B'de +8,4 m felaket üretti)
+            #   * `residual_gate` 0,50 -> **0,30** EKLENDİ: çalışan yataklarda etkisi
+            #     tam sıfır, ama hizalamanın GT'ye oturmadığı rejimde sistemi
+            #     "hiçbir şey yapmamaktan kötü" olmaktan kurtarıyor
+            #     (2025 termal: 53,5 -> 27,0 ve 101,7 -> 62,3 m)
+            #
+            #   NİHAİ SONUÇ:
+            #     2026 sınavı   16,68 -> 11,88 m (6 perm, eşleştirilmiş, −4,80 ±0,95)
+            #     5 bağımsız yatak ortalaması 35,42 -> 22,27 m
+            #     video1/video2 nötr
+            # Homografi + merdiven reçetesi ARTIK CPU yedeğinde de kullanılıyor.
+            # Eski LK yedeği `method="fuzyon"` + merdiven kapalıydı; ölçülünce bunun
+            # yanlış olduğu görüldü (video1'de 20,39 m; aynı motor merdivenle 6,36 m).
+            # Yalnız LK son-çare yolunda eski füzyon reçetesi korunur.
+            self.config = EstimatorConfig(
+                method="fuzyon" if self.engine_used == "lk" else "homografi")
         self._est = VoLadderEstimator(self.profile, self.config, spacing=self.spacing)
         logging.info(f"LivePositionEstimator: motor={self.engine_used}, "
                      f"yontem={self.config.method}, profil={self.profile.name}")
@@ -148,9 +209,13 @@ class LivePositionEstimator:
             self._normal_cons = meas_cons.hom_normal
 
         meas_ladder = None
-        if self.engine_used == "raft":   # merdiven yalnız RAFT'ta (kanıtlı karar)
+        if self.engine_used in ("raft", "sift"):   # merdiven: RAFT ve SIFT'te açık
+            # Merdiven ölçümü kendi geometri ayarını alır (bkz. `merdiven_gnc_c`):
+            # uzun tabanda düzlem modeli zorlandığı için orada GNC uygulanır.
+            mg = ({} if not self.config.merdiven_gnc_c
+                  else dict(gnc_c=float(self.config.merdiven_gnc_c)))
             meas_ladder = PairMeasurement.compute(
-                self._kf[1], gray, self.profile, self._tracker, self._normal_ladder)
+                self._kf[1], gray, self.profile, self._tracker, self._normal_ladder, **mg)
             if meas_ladder.hom_ok:
                 self._normal_ladder = meas_ladder.hom_normal
 

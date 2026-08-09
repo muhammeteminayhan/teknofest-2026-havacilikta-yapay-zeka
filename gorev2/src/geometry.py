@@ -90,6 +90,39 @@ def estimate_similarity(
     ransac_thresh: float = 1.0,
     min_inliers: int = 15,
     robust_method: int = cv2.RANSAC,
+    n_deneme: int = 1,
+) -> Optional[SimilarityMotion]:
+    """Benzerlik hareketi; ``n_deneme>1`` ise topluluk (bkz.
+    :func:`estimate_homography_motion` — aynı sıra-duyarlılığı gerekçesi)."""
+    if n_deneme > 1:
+        rng = np.random.default_rng(12345)
+        adaylar = []
+        for _ in range(n_deneme):
+            j = rng.permutation(len(pts0))
+            s = _sim_tek(pts0[j], pts1[j], ref_point, ransac_thresh,
+                         min_inliers, robust_method)
+            if s is not None:
+                adaylar.append(s)
+        if not adaylar:
+            return None
+        return SimilarityMotion(
+            du=float(np.median([s.du for s in adaylar])),
+            dv=float(np.median([s.dv for s in adaylar])),
+            scale=float(np.median([s.scale for s in adaylar])),
+            angle_rad=float(np.median([s.angle_rad for s in adaylar])),
+            n_inliers=int(np.median([s.n_inliers for s in adaylar])),
+            inlier_ratio=float(np.median([s.inlier_ratio for s in adaylar])),
+        )
+    return _sim_tek(pts0, pts1, ref_point, ransac_thresh, min_inliers, robust_method)
+
+
+def _sim_tek(
+    pts0: np.ndarray,
+    pts1: np.ndarray,
+    ref_point: Optional[tuple[float, float]] = None,
+    ransac_thresh: float = 1.0,
+    min_inliers: int = 15,
+    robust_method: int = cv2.RANSAC,
 ) -> Optional[SimilarityMotion]:
     """RANSAC ile 4 serbestlikli benzerlik hareketi kestir; başarısızsa None.
 
@@ -137,6 +170,168 @@ def estimate_similarity(
 # --------------------------------------------------------------------------
 # 2) Homografi yolu
 # --------------------------------------------------------------------------
+def _normalize_pts(p: np.ndarray):
+    """Hartley normalizasyonu: merkez 0, ortalama uzaklık √2 (DLT koşullanması)."""
+    mu = p.mean(axis=0)
+    q = p - mu
+    s = float(np.sqrt(2.0) / max(np.sqrt((q ** 2).sum(axis=1)).mean(), 1e-12))
+    T = np.array([[s, 0.0, -s * mu[0]], [0.0, s, -s * mu[1]], [0.0, 0.0, 1.0]])
+    return q * s, T
+
+
+def _dlt_agirlikli(p0: np.ndarray, p1: np.ndarray, w: np.ndarray) -> Optional[np.ndarray]:
+    """Ağırlıklı normalize DLT ile homografi çöz (p1 ≈ H·p0)."""
+    n0, T0 = _normalize_pts(p0)
+    n1, T1 = _normalize_pts(p1)
+    sw = np.sqrt(np.maximum(w, 0.0))
+    x, y = n0[:, 0], n0[:, 1]
+    u, v = n1[:, 0], n1[:, 1]
+    z = np.zeros_like(x)
+    o = np.ones_like(x)
+    A = np.empty((2 * len(x), 9))
+    A[0::2] = np.column_stack([-x, -y, -o, z, z, z, u * x, u * y, u]) * sw[:, None]
+    A[1::2] = np.column_stack([z, z, z, -x, -y, -o, v * x, v * y, v]) * sw[:, None]
+    # Çözüm A'nın en küçük tekil değerine ait sağ tekil vektörü. Bunu A'nın tam
+    # SVD'si yerine **normal denklemlerden** (AᵀA'nın en küçük özvektörü) alıyoruz:
+    # AᵀA 9×9'dur, kurulumu O(N·81), özayrışması sabit maliyet — 1200×9'luk SVD'den
+    # kat kat ucuz. GNC her çift için ~20 kez çözdüğü için bu fark canlı hızda
+    # doğrudan görünür. Hartley normalizasyonu önce uygulandığı için A iyi
+    # koşullanmıştır; AᵀA'nın koşul sayısını karesine çıkarması sorun yaratmaz.
+    try:
+        _, V = np.linalg.eigh(A.T @ A)
+        Hn = V[:, 0].reshape(3, 3)
+    except np.linalg.LinAlgError:
+        return None
+    H = np.linalg.inv(T1) @ Hn @ T0
+    return H / H[2, 2] if abs(H[2, 2]) > 1e-12 else None
+
+
+def _transfer_hata(H: np.ndarray, p0: np.ndarray, p1: np.ndarray) -> np.ndarray:
+    """Simetrik transfer hatası [px] (ileri + geri izdüşüm)."""
+    def ileri(M, a):
+        h = np.column_stack([a, np.ones(len(a))]) @ M.T
+        wz = np.where(np.abs(h[:, 2]) < 1e-12, 1e-12, h[:, 2])
+        return h[:, :2] / wz[:, None]
+    try:
+        Hi = np.linalg.inv(H)
+    except np.linalg.LinAlgError:
+        return np.full(len(p0), np.inf)
+    return (np.linalg.norm(ileri(H, p0) - p1, axis=1)
+            + np.linalg.norm(ileri(Hi, p1) - p0, axis=1)) * 0.5
+
+
+def gnc_homografi(p0: np.ndarray, p1: np.ndarray, H0: np.ndarray,
+                  c: float = 1.0, tur: str = "tls", n_yineleme: int = 20,
+                  faktor: float = 1.4) -> Optional[np.ndarray]:
+    """Kademeli dışbükeysizleştirme (GNC) ile robust homografi.
+
+    Kaynak alan: **robust uzaysal algılama / optimizasyon** (Yang & Carlone,
+    arXiv:1909.08605; TEASER++). Bu boru hattına neden uygun:
+
+    * **RANSAC** aykırıları *ayrık* seçer; merdiven çiftlerinde düzleme uyan oran
+      ~%56 olduğu için birbirine yakın skorlu birden çok düzlem yarışır ve seçim
+      nokta sırasına bağlı olur (ölçüldü: uçtan uca %18,7 yayılım).
+    * **Sabit ölçekli IRLS** (bu dosyada, reddedildi) varyansı yok etti ama 3B yapıyı
+      modele geri soktu → yanlılık (+0,36 … +1,82 m).
+
+    GNC ikisinin arasını kapatır: dışbükeye yakın bir vekil maliyetle **tüm noktalardan**
+    başlar (iyi bir havzaya düşer), sonra dışbükeysizlik parametresini kademeli
+    keskinleştirerek **sert kesmeye** yakınsar (yapı noktaları dışarıda kalır).
+    Black–Rangarajan ikiliği sayesinde her adım ağırlıklı en küçük karelerdir.
+
+    ``tur="tls"``  — kesilmiş en küçük kareler vekili (yakınsamada sert kesme)
+    ``tur="gm"``   — Geman-McClure (yakınsamada yumuşak, asla tam sıfırlamaz)
+    ``c``          — kesme yarıçapı [px]; yeniden-izdüşüm eşiğinin muadili.
+    """
+    H = H0.copy()
+    r = _transfer_hata(H, p0, p1)
+    if not np.all(np.isfinite(r)):
+        return None
+    c2 = float(c) ** 2
+    r2max = float(np.max(r ** 2))
+    if r2max <= 1e-12:
+        return H
+
+    if tur == "tls":
+        # mu kucukten buyuge: baslangicta neredeyse tum noktalar agirlikli (dışbukey)
+        mu = c2 / max(2.0 * r2max - c2, 1e-9)
+        mu = float(np.clip(mu, 1e-6, 1.0))
+    else:
+        mu = 2.0 * r2max / c2                      # buyukten kucuge
+
+    for _ in range(n_yineleme):
+        r2 = r ** 2
+        if tur == "tls":
+            ust = (mu + 1.0) / mu * c2
+            alt = mu / (mu + 1.0) * c2
+            w = np.zeros_like(r2)
+            w[r2 <= alt] = 1.0
+            orta = (r2 > alt) & (r2 < ust)
+            if orta.any():
+                w[orta] = (c * np.sqrt(mu * (mu + 1.0))
+                           / np.maximum(np.sqrt(r2[orta]), 1e-9) - mu)
+            w = np.clip(w, 0.0, 1.0)
+        else:
+            w = (mu * c2 / (r2 + mu * c2)) ** 2
+
+        if w.sum() < 4:
+            break
+        Hy = _dlt_agirlikli(p0, p1, w)
+        if Hy is None:
+            break
+        ry = _transfer_hata(Hy, p0, p1)
+        if not np.all(np.isfinite(ry)):
+            break
+        H, r = Hy, ry
+        mu = mu * faktor if tur == "tls" else mu / faktor
+        if (tur == "tls" and mu > 1e6) or (tur != "tls" and mu < 1.0):
+            break
+    return H
+
+
+def irls_homografi(p0: np.ndarray, p1: np.ndarray, H0: np.ndarray,
+                   c: float = 2.0, n_yineleme: int = 8) -> Optional[np.ndarray]:
+    """RANSAC çözümünü **tüm noktalar** üzerinde Cauchy M-kestirimiyle iyileştir.
+
+    NEDEN: RANSAC inlier kümesini *ayrık* seçer. Merdiven çiftlerinde düzleme
+    uyan nokta oranı ~%56 olduğu için birbirine yakın skorlu **birden çok düzlem**
+    yarışır; hangisinin seçildiği nokta sırasına bağlıdır (ölçüldü: uçtan uca
+    resmî metrikte 10 permütasyonda 3,67–4,41 m yayılım). Ayrık seçim yerine
+    sürekli ağırlık ``w = 1/(1+(r/c)²)`` kullanmak:
+
+    * seçim varyansını ortadan kaldırır (çözüm tek ve süreklidir),
+    * 3B yapıyı (bina/ağaç) atmak yerine **söndürür** — zemin düzlemine
+      yakın noktalar ağırlığını korur, uzaklar yumuşakça sıfırlanır.
+
+    ``c`` piksel cinsinden ölçek parametresidir (yeniden-izdüşüm eşiğinin muadili).
+
+    **DENENDİ ve REDDEDİLDİ.** Varyansı beklendiği gibi yok etti (aynı çiftin farklı
+    permütasyonlarında hareket kestiriminin std'si **1e-3 → 1e-6**, yani çözüm tek ve
+    kararlı) ama hatayı BÜYÜTTÜ (video1, 6 permütasyon, eşleştirilmiş):
+        c=1,5 → **+0,360 m**,   c=2,0 → **+1,817 m**  (temel 3,917 m)
+    Yorum: merdiven çiftlerinde düzleme uymayan ~%40'lık kesim **gürültü değil, gerçek
+    3B yapı** (bina, ağaç). Yumuşak ağırlık onları modele geri sokuyor ve düzlemi
+    zeminden yukarı çekiyor → ölçek yanlılığı. Bu sahnede **sert reddetme doğru araç**.
+    Kayıt olarak bırakıldı; varsayılan kapalı (``irls_c=None``).
+    """
+    H = H0.copy()
+    for _ in range(n_yineleme):
+        r = _transfer_hata(H, p0, p1)
+        if not np.all(np.isfinite(r)):
+            return None
+        w = 1.0 / (1.0 + (r / c) ** 2)
+        if w.sum() < 4:
+            return None
+        Hy = _dlt_agirlikli(p0, p1, w)
+        if Hy is None:
+            return None
+        if np.linalg.norm(Hy - H) < 1e-10:
+            H = Hy
+            break
+        H = Hy
+    return H
+
+
 @dataclass
 class HomographyMotion:
     """Homografi ayrıştırmasından seçilen fiziksel çözüm.
@@ -188,6 +383,73 @@ def estimate_homography_motion(
     min_inliers: int = 15,
     prev_normal: Optional[np.ndarray] = None,
     robust_method: int = cv2.RANSAC,
+    n_deneme: int = 1,
+    irls_c: Optional[float] = None,
+    gnc_c: Optional[float] = None,
+    gnc_tur: str = "tls",
+    gnc_mad: Optional[float] = None,
+) -> Optional[HomographyMotion]:
+    """Homografi hareketi; ``n_deneme>1`` ise **topluluk (ensemble)** kestirimi.
+
+    NEDEN TOPLULUK: OpenCV RANSAC girdi verildiğinde deterministiktir ama nokta
+    **sırasına** duyarlıdır — aynı noktalar farklı sırada verilince farklı minimal
+    örnekler çekilir ve *eşit derecede iyi ama farklı* bir model seçilir. Ölçüldü
+    (merdiven çiftleri): inlier oranı |fark| ort 0,042 / maks 0,23; uçtan uca resmî
+    metrikte 10 permütasyonda **ort 3,964 ± 0,226 m (yayılım 0,74 m = %18,7)**.
+
+    Bu oynaklık kesinti boyunca bağımsız değil — sahne benzer olduğu için aynı
+    "kötü düzlem" ardışık karelerde tekrar seçilir ve blok içinde *sistematik*
+    sapma gibi görünür. Aynı çiftin birden çok permütasyonunu kestirip
+    bileşen bazında **medyan** almak bu seçim varyansını söndürür.
+
+    Maliyet yalnız geometri katmanındadır (RAFT akışı bir kez hesaplanır).
+
+    **DENENDİ ve REDDEDİLDİ.** n=3 ile video1'de 3,917 → 3,974 m; ne hata ne varyans
+    düştü. Gerekçe (IRLS denemesiyle aynı köke çıkıyor): permütasyonlar arası fark
+    salt gürültü değil — farklı permütasyonlar farklı *düzlemler* seçiyor ve bunların
+    medyanı fiziksel olarak anlamlı bir düzlem vermiyor. Varsayılan ``n_deneme=1``.
+    """
+    if n_deneme > 1:
+        rng = np.random.default_rng(12345)
+        adaylar = []
+        for _ in range(n_deneme):
+            j = rng.permutation(len(pts0))
+            h = _hom_tek(pts0[j], pts1[j], K, ransac_thresh, min_inliers,
+                         prev_normal, robust_method, irls_c, gnc_c, gnc_tur, gnc_mad)
+            if h is not None:
+                adaylar.append(h)
+        if not adaylar:
+            return None
+        # Bileşen bazında medyan: normal ve yer değiştirme yönü aynı yarıkürede
+        # olduğu için (fiziksel çözüm seçimi bunu garanti eder) doğrudan medyan
+        # alınabilir; yaw zaten küçük açı, sarma sorunu yok.
+        d = np.median(np.array([h.cam_delta_over_d for h in adaylar]), axis=0)
+        nrm = np.median(np.array([h.n for h in adaylar]), axis=0)
+        nrm = nrm / max(float(np.linalg.norm(nrm)), 1e-12)
+        yaw = float(np.median([h.yaw_delta_rad for h in adaylar]))
+        c, s = np.cos(-yaw), np.sin(-yaw)
+        return HomographyMotion(
+            R=np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]),
+            cam_delta_over_d=d, n=nrm,
+            n_inliers=int(np.median([h.n_inliers for h in adaylar])),
+            inlier_ratio=float(np.median([h.inlier_ratio for h in adaylar])),
+        )
+    return _hom_tek(pts0, pts1, K, ransac_thresh, min_inliers, prev_normal,
+                    robust_method, irls_c, gnc_c, gnc_tur, gnc_mad)
+
+
+def _hom_tek(
+    pts0: np.ndarray,
+    pts1: np.ndarray,
+    K: np.ndarray,
+    ransac_thresh: float = 1.0,
+    min_inliers: int = 15,
+    prev_normal: Optional[np.ndarray] = None,
+    robust_method: int = cv2.RANSAC,
+    irls_c: Optional[float] = None,
+    gnc_c: Optional[float] = None,
+    gnc_tur: str = "tls",
+    gnc_mad: Optional[float] = None,
 ) -> Optional[HomographyMotion]:
     """Homografi kestir, ayrıştır ve fiziksel çözümü seç; başarısızsa None.
 
@@ -206,6 +468,30 @@ def estimate_homography_motion(
     mask = mask.reshape(-1).astype(bool)
     if mask.sum() < min_inliers:
         return None
+
+    H_iyi = None
+    if gnc_mad is not None:
+        # KESME YARIÇAPINI VERİDEN TÜRET: c = k · 1,4826 · MAD(artıklar).
+        # Sabit `c` modaliteler arasında taşınmıyor (termal büyük, RGB küçük c
+        # istiyor); MAD ölçeği her kare çiftinde kendini ayarlar, böylece tek
+        # ayar (k) üç kamerada da aynı istatistiksel anlamı taşır.
+        r0 = _transfer_hata(H, pts0, pts1)
+        if np.all(np.isfinite(r0)):
+            mad = float(np.median(np.abs(r0 - np.median(r0)))) * 1.4826
+            c_mad = max(gnc_mad * mad, 1e-3)
+            H_iyi = gnc_homografi(pts0, pts1, H, c=c_mad, tur=gnc_tur)
+    elif gnc_c is not None:
+        H_iyi = gnc_homografi(pts0, pts1, H, c=gnc_c, tur=gnc_tur)
+    elif irls_c is not None:
+        # RANSAC yalnizca baslangic noktasi; asil cozum tum noktalar uzerinde
+        # surekli agirlikli M-kestirimiyle bulunur (bkz. irls_homografi).
+        H_iyi = irls_homografi(pts0, pts1, H, c=irls_c)
+    if H_iyi is not None:
+        H = H_iyi
+        r = _transfer_hata(H, pts0, pts1)
+        mask = r < ransac_thresh              # raporlanan inlier orani tutarli kalsin
+        if mask.sum() < min_inliers:
+            mask = r < max(ransac_thresh, float(np.median(r)))
 
     try:
         _, Rs, ts, ns = cv2.decomposeHomographyMat(H, K)

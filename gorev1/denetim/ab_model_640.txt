@@ -1,0 +1,29 @@
+=== GOREV 1 — IKI MODEL A/B: mevcut YOLOv8s vs DINOv3-YOLO ===
+74 gercek yarisma karesi (6 ardisik blok), imgsz=640
+uretim yolu: Gorev1Detector + BoT-SORT takip (ikisi de ayni)
+
+                          MEVCUT      ADAY
+toplam tespit                292       314
+bos kare                      15        12
+ms/kare                       98       101
+ultralytics               8.4.92    8.4.80
+
+--- sinif bazinda tespit ---
+sinif        MEVCUT     ADAY    ortak  yalniz aday  gercek kayip
+Tasit           218      271      216           55             2
+Insan            50       13        0           13            22
+UAP              12       24       12           12             0
+UAI              12        6        0            6            12
+
+yer degistirme (olcum artefakti, kayip DEGIL): 28
+
+--- olcutler (ab_cozunurluk.py ile ayni) ---
+[OK ] net kazanc: +86 yalniz-aday / -36 gercek kayip
+[RED] kayip orani: %12.3 (esik %10)
+[OK ] yeni tespit boyutu: medyan 11583 px2 (108x108) — esik 1600 px2
+[OK ] sure butcesi: 101 ms <= 2400 ms
+[OK ] bos kare azaldi mi: 15 -> 12
+
+>>> TAVSIYE: MEVCUT model kalsin — aday yukaridaki RED olcutlerinden kaldi.
+
+gorsel kanit: 4 panel -> denetim/ab_model_*.png

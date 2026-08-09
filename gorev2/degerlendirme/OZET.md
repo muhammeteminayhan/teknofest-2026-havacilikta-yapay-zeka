@@ -3,6 +3,24 @@
 **Bağlam:** Puanlı oturumda PK (Pozisyon Kestirimi) **55,29 puan / 8 takım içinde 8.** sırada
 kaldı. Bu çalışma, resmî metrik altında ölçüme dayalı iyileştirme arayışıdır.
 
+> **⚠️ Güncel durum (29 Tem 2026): düşey kanal turu GERİ ALINDI.**
+> `z_sim_agirlik=1.0` örnek veri setinde 3,757 → 2,795 m (−%25,6) kazandırıyordu; ancak
+> **puanlı oturumun kendi kareleriyle** yapılan genelleme sınavında iki bağımsız
+> pencerede de kaybetti (16,04 → 20,07 m ve 18,46 → 18,62 m). Sebep: bütün ayar
+> çalışması `THYZ_2026_Ornek_Veri_1.MP4` üzerinde yapılmıştı ve o video **test
+> oturumunun ta kendisi**; puanlı oturum başka bir uçuş. Kanal sistemden kaldırıldı —
+> tam kayıt: [DUSEY_KANAL.md](DUSEY_KANAL.md).
+>
+> **Yürürlükteki (teslim edilen) reçete = puanlı oturumda koşan reçetenin kendisi:**
+> RAFT + düzlemsel homografi + keyframe merdiveni (spacing=8), `EstimatorConfig`
+> varsayılanları (`smooth_alpha=0.6`), düşey bileşen homografi ayrıştırmasından.
+> Puanlı oturum sonrası denenen iki değişiklik (`z_sim_agirlik=1.0` ve
+> `smooth_alpha=1.0`) genelleme sınavında doğrulanamadığı için **ikisi de geri alındı**.
+>
+> **Yeni zorunlu kapı:** her değişiklik [`genelleme_sinavi.py`](../genelleme_sinavi.py)
+> ile puanlı oturumun iki penceresinde de kazanmak zorunda. Aşağıdaki tarihsel bulgular,
+> yalnız örnek veri setinde ölçülmüş olduklarından bu kapıdan geçmemiş sayılır.
+
 **Resmî metrik** (`src/evaluation.py:competition_error`, teknik şartname Denklem 2):
 *tüm karelerde ortalama Öklid hatası*. Sağlıklı karelerde herkes GT'yi aynaladığı için hata 0;
 **puanı yalnızca kesinti karelerindeki hata belirler.**

@@ -1,0 +1,38 @@
+=== GOREV 1 — IKI MODEL A/B: mevcut YOLOv8s vs DINOv3-YOLO ===
+74 gercek yarisma karesi (6 ardisik blok), imgsz=1280
+uretim yolu: Gorev1Detector + BoT-SORT takip (ikisi de ayni)
+
+                          MEVCUT      ADAY
+toplam tespit                351       332
+bos kare                      12        12
+ms/kare                      114       190
+ultralytics               8.4.92    8.4.80
+
+--- sinif bazinda tespit ---
+sinif        MEVCUT     ADAY    ortak  yalniz aday  gercek kayip
+Tasit           261      272      259           13             2
+Insan            55       26       11           15            41
+UAP              12       24       12           12             0
+UAI              23       10       10            0            13
+
+yer degistirme (olcum artefakti, kayip DEGIL): 3
+
+--- olcutler (ab_cozunurluk.py ile ayni) ---
+[RED] net kazanc: +40 yalniz-aday / -56 gercek kayip
+[RED] kayip orani: %16.0 (esik %10)
+[OK ] yeni tespit boyutu: medyan 7964 px2 (89x89) — esik 1600 px2
+[OK ] sure butcesi: 190 ms <= 2400 ms
+[OK ] bos kare azaldi mi: 12 -> 12
+
+>>> TAVSIYE: MEVCUT model kalsin — aday yukaridaki RED olcutlerinden kaldi.
+
+gorsel kanit: 6 panel -> denetim/ab_model_*.png
+--- GORSEL DOGRULAMA (gozle, kirpilmis yakin gorunum) ---
+frame_001478: MEVCUT 8 tespit / ADAY 1 tespit (yalniz UAI).
+Mevcut modelin "Insan" kutulari TEK TEK kirpilip incelendi:
+  * (1166,981) 16x14 px  -> GERCEK insan: yukaridan bakis, koyu sac + acik govde, kollar secilir
+  * ( 716,1013) 22x18 px -> GERCEK insan: koprude yuruyen kisi, yaninda ikinci kisi
+  * ( 770,508)  22x20 px -> belirsiz: yerde koyu ortu/kumas yigini; insan grubu da olabilir
+Sonuc: kacirilan tespitlerin en az bir kismi DOGRULANMIS gercek insandir; adayin
+dusuk Insan sayisi "yanlis pozitif elemek" degil, GERCEK KACIRMADIR (recall dususu).
+Bu, checkpoint metrikleriyle de tutarli: aday recall 0.858 vs mevcut 0.943.

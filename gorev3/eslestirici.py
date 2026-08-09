@@ -7,8 +7,9 @@ Oturum başında referans nesneler kaydedilir (`register_reference` /
 
 Omurga tercihi:
   - VARSAYILAN "dinov3" (HuggingFace, önbellekten çevrimdışı).
-  - Görev 1 vanilla YOLOv8s olduğu için paylaşılacak DINO omurgası YOK; Görev 3
-    kendi omurgasını yükler (~0,1 GB VRAM). İstenirse "dinov2"ye tek satırla geçilir.
+  - Görev 1'in gövdesi ayrı bir YOLO grafiği içinde olduğundan paylaşılabilir bir
+    DINO örneği YOK; Görev 3 kendi omurgasını yükler (~0,1 GB VRAM). İstenirse
+    "dinov2"ye tek satırla geçilir.
 
 Çıktı: her eşleşme için {object_id, top_left_x/y, bottom_right_x/y} sözlüğü;
 `sistem` tarafında `ReferencePrediction`a (referansın kendi url'i + kare url'i +
