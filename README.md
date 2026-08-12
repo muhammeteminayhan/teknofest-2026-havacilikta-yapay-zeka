@@ -1,4 +1,4 @@
-# TEKNOFEST 2026 — Havacılıkta Yapay Zeka (Takım: bugbuster)
+# TEKNOFEST 2026 — Havacılıkta Yapay Zeka (Takım: bugbuster)-
 
 İnsansız hava aracının alt-görüş kamerasından gelen kareler üzerinde **üç görevi** aynı
 canlı oturumda çalıştıran sistem:
