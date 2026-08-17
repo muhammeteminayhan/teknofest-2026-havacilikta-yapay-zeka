@@ -1,4 +1,4 @@
-# 🏁 Yarışma Günü Kullanım Kılavuzu
+# 🏁 Yarışma Günü Kullanım Kılavuzu-
 
 Bu dosya, yarışma günü sistemi **adım adım** nasıl çalıştıracağını anlatır. Sistem üç görevi
 (Görev 1 nesne tespiti + Görev 2 konum + Görev 3 görüntü eşleme) tek komutla, otomatik yapar.
