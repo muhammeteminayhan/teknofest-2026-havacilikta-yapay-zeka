@@ -92,7 +92,7 @@ def _kos_modu(args):
                 r = d.model.predict(img, imgsz=args.imgsz, conf=args.conf, verbose=False)[0]
                 objs = []
                 for b, k in zip(r.boxes.xyxy.tolist(), r.boxes.cls.tolist()):
-                    objs.append({"cls": Gorev1Detector._spec_cls(int(k)),
+                    objs.append({"cls": d.spec_cls(int(k)),
                                  "top_left_x": int(b[0]), "top_left_y": int(b[1]),
                                  "bottom_right_x": int(b[2]), "bottom_right_y": int(b[3])})
             else:
@@ -145,6 +145,13 @@ def main():
     ap.add_argument("--oturum", default="THYZ_2026_Online_Yarisma")
     ap.add_argument("--panel", type=int, default=6)
     ap.add_argument("--aday", default=None, help="karsilastirilacak aday agirlik (.pt)")
+    # Iki kol FARKLI cozunurluk isteyebilir: her agirlik KENDI egitim cozunurlugunde
+    # kosturulmali (ViT govdeler egitimden uzaklasinca bozulur). Ornek: mevcut
+    # best_dinov3.pt 640'ta, trial-8 1280'de egitildi.
+    ap.add_argument("--mevcut", default=None,
+                    help="referans (mevcut) agirlik; verilmezse agirliklar/best.pt")
+    ap.add_argument("--imgsz-aday", dest="imgsz_aday", type=int, default=None,
+                    help="aday kolunun imgsz'i (verilmezse --imgsz ile ayni)")
     ap.add_argument("--fork-yolu", dest="fork_yolu", default=None,
                     help="aday ozel bir ultralytics fork'u istiyorsa o dizin (gecici sys.path)")
     args = ap.parse_args()
@@ -154,6 +161,12 @@ def main():
     if not args.aday:
         sys.exit("HATA: --aday <agirlik.pt> verilmeli (karsilastirilacak model).")
     ADAY_PT = Path(args.aday)
+    # DIKKAT: main() icinde atandigi icin MEVCUT_PT burada YEREL degiskendir;
+    # kosullu atama UnboundLocalError uretirdi. Her durumda ataniyor.
+    MEVCUT_PT = Path(args.mevcut) if args.mevcut else GOREV1 / "agirliklar" / "best.pt"
+    if not MEVCUT_PT.exists():
+        sys.exit(f"HATA: mevcut agirlik yok: {MEVCUT_PT}")
+    IMGSZ_ADAY = args.imgsz_aday if args.imgsz_aday is not None else args.imgsz
     FORK = Path(args.fork_yolu) if args.fork_yolu else None
     if not ADAY_PT.exists():
         sys.exit(f"HATA: aday agirlik yok: {ADAY_PT}")
@@ -169,13 +182,14 @@ def main():
             bloklar.append(blok)
     n_kare = sum(len(b) for b in bloklar)
     print(f"Oturum: {len(tum)} kare | test: {len(bloklar)} ardisik blok, {n_kare} kare")
-    print(f"imgsz={args.imgsz} (ikisi de ayni)\n")
+    print(f"MEVCUT: {MEVCUT_PT.name} @ imgsz={args.imgsz} | "
+          f"ADAY: {ADAY_PT.name} @ imgsz={IMGSZ_ADAY}\n")
 
-    print("[1/2] MEVCUT (YOLOv8s, kurulu ultralytics) kosuluyor...")
+    print("[1/2] MEVCUT kosuluyor...")
     A = _alt_surec_kos(MEVCUT_PT, None, bloklar, args.imgsz, OUT / "_ab_a.json", 0.25, args.takipsiz)
     print(f"      {A['ms']:.0f} ms/kare | ultralytics {A['ultralytics']}")
-    print("[2/2] ADAY (DINOv3-YOLO, fork gecici) kosuluyor...")
-    B = _alt_surec_kos(ADAY_PT, FORK, bloklar, args.imgsz, OUT / "_ab_b.json", args.conf, args.takipsiz)
+    print("[2/2] ADAY kosuluyor...")
+    B = _alt_surec_kos(ADAY_PT, FORK, bloklar, IMGSZ_ADAY, OUT / "_ab_b.json", args.conf, args.takipsiz)
     print(f"      {B['ms']:.0f} ms/kare | ultralytics {B['ultralytics']}\n")
 
     sonuc_a, sonuc_b = A["tespitler"], B["tespitler"]

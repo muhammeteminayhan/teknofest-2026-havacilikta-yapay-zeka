@@ -279,10 +279,14 @@ Yani `smooth_alpha=0,6` ve `calib_window=60` artık **istatistiksel olarak doğr
 sınav −0,191 ±0,240, video1 −0,000 ±0,013, video2 +0,010 ±0,156 → **ETKİSİZ**, sevk edilmedi.
 
 ## 5. Açık işler
-- **Sınav 1. penceresinin teşhisi.** Denenen hiçbir `min_inlier_ratio` değeri p1'i
-  iyileştirmiyor (0,25 → +1,04; 0,15 → +1,80; 0,05 → +1,50). Yumuşak harmanlama da
-  çözmedi. O penceredeki 600 karelik kesintide zayıf ölçümlerin neden zarar verdiği
-  ayrı bir inceleme konusu.
+- ~~**Sınav 1. penceresinin teşhisi.**~~ ✅ **KAPANDI (13 Ağu 2026)** — sebep zayıf
+  ölçüm değil, `z_sign` kestiriminin yanlış tarafa oturmasıydı. Pencere 1'in
+  17,3 m'lik hatasının 11,0 m'si **düşey eksende**; uçak 940-1000 karelerinde 10 m
+  irtifa değiştiriyor ve sistem bunu ters işaretle işliyor. Düzeltildi:
+  17,26 → **11,46 m**, 7 yatak ortalaması 8,12 → **6,69 m**.
+  Ayrıntı: [Z_ISARETI.md](Z_ISARETI.md). *(Bu maddenin altındaki eski
+  `min_inlier_ratio` taramaları — 0,25 → +1,04; 0,15 → +1,80; 0,05 → +1,50 — doğru
+  ölçümlerdi ama yanlış kanalı arıyordu.)*
 - **Varyansı düşürmek.** Yeni yapılandırma ortalamayı düşürdü ama yayılım hâlâ büyük
   (video2 ±1,7; sınav ±1,7–2,0). Yarışma tek çekiliş olduğu için yayılım doğrudan risktir.
   IRLS varyansı çözüyordu ama yanlılık ekliyordu — arada bir yol aranabilir

@@ -51,7 +51,17 @@ matching:
   max_box_area_ratio: 0.55        # kutu kare alaninin > %55'ini kapliyorsa REDDET (whole-image guard)
   # --- ortak / "ratio" yonteminin parametreleri (geri uyum) ---
   cls_threshold: 0.3              # Threshold for early rejection (if _cls_filter is ever re-enabled)
-  min_confidence: 0.25            # Minimum absolute similarity to trigger a valid detection
+  # 0,25 KORUNDU — 0,10 denendi ve GORSEL KANITLA reddedildi (10 Eyl 2026).
+  # Test yatagi 0,10'u once daha iyi gosteriyordu (recall %81,9 -> %85,7) ama o
+  # olcut "kare basina tespit VAR MI" diye sorar, "DOGRU YERDE MI" diye degil.
+  # Ayrisan 8 karenin paneli uretildi: 0,10'un ekledigi dort aktif-aralik tespiti
+  # de YANLIS nesnede (basketbol sahasi referansi -> yol; yildiz motifi referansi
+  # -> kiremit cati, yaya gecidi, kapi onu pasparasi). Ustelik nesnenin HIC
+  # olmadigi kontrol karelerinde de daha cok atesliyor (6/14 -> 11/14). mAP'te
+  # her fazladan kutu dogrudan yanlis pozitiftir; tespit uretmemek daha iyidir.
+  # 0,10 hicbir tespiti KAYBETTIRMIYOR (a_var_b_yok=0), yalnizca yanlis ekliyor.
+  # Kayit: gorev3/degerlendirme/MIN_CONFIDENCE.md · panel: mc_ab_*.jpg
+  min_confidence: 0.25            # mutlak benzerlik tabani (istatistiksel kapiya EK)
   threshold_ratio: 0.60           # ("ratio") heatmap'i tepenin %60'inda kes
   noise_floor: 0.15               # ("ratio") mutlak alt esik
   

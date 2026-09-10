@@ -156,6 +156,22 @@ graf optimizasyonu** kurmaktır; bu, bu turun kapsamını aşan ayrı bir çalı
 **Not:** VGGT hız açısından fazlasıyla uygun (**0,07 s/kare**, bütçe 2,4 sn) ve tek parçada
 %2 hata veriyor — ileride zincirleme düzgün kurulursa **en umut verici aday** budur.
 
+> ## ⛔ DÜZELTME (14 Ağu 2026): yukarıdaki not GEÇERSİZDİR
+>
+> Buradaki "%2 hata" ve "sorun VGGT'de değil parça birleştirmede" tespiti **tek bir
+> pencereden** (ilk 50 kare) geliyordu. 563 parçanın tamamında ölçülünce çürüdü:
+>
+> | ölçüt (kâhin Sim(3), 8 karelik parçalar) | VGGT | RAFT+homografi |
+> |---|---|---|
+> | parça içi artık / GT yolu, medyan | **%8,1** | **%1,0** |
+> | parça ölçeği değişim katsayısı | **%78** | — |
+>
+> Çözünürlük şekil hatasını düzeltiyor (294→392 px: %6,2→%3,4) ama **parça ölçeğinin
+> tutarsızlığını düzeltmiyor** (%52→%47); 518 px bu GPU'da paging'e giriyor.
+> Derinlikle normalizasyon da ölçek gürültüsünü hiç azaltmıyor (%42 → %43).
+>
+> **Aile kapandı.** Ayrıntı ve yeniden açılma koşulları: [VGGT_TURU.md](VGGT_TURU.md)
+
 ### Denenmeyenler (gerekçe)
 
 | Sistem | Neden denenmedi |

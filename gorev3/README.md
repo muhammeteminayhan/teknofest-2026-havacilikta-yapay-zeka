@@ -64,8 +64,12 @@ değil, **ölçek uyuşmazlığı** — sistem doğru çalışıyor.
 
 **Gerçek yarışma referansları geldiğinde** `template_config.yaml` içindeki eşikleri
 ayarlayın:
-- `matching.min_confidence` (0.25) — eşleşme kabul eşiği. **Yanlış pozitif skoru düşürür**;
-  referanslar zayıf eşleşiyorsa düşürün, çok gürültü varsa yükseltin.
+- `matching.min_confidence` (**0.25**) — istatistiksel kapıya EK mutlak taban.
+  0,10 denendi: recall %81,9 → %85,7 çıkıyor ama eklenen dört aktif-aralık tespitinin
+  **dördü de yanlış nesnede** (görsel panel: `degerlendirme/mc_ab_YAKIN.jpg`). Test
+  yatağının recall'ü "tespit var mı" diye sorar, "doğru yerde mi" diye değil; mAP'te
+  yanlış kutu doğrudan yanlış pozitiftir. **0,25 korundu** — bkz.
+  `degerlendirme/MIN_CONFIDENCE.md`. Ayrımı yapan asıl ölçüt `k_std` (3.0).
 - `matching.threshold_ratio` (0.60), `matching.noise_floor` (0.15) — kutu sınırı.
 - `fpn.levels` (224/168/112) — nesne ölçeğine göre. Referans hava-görüşüne yakınsa
   daha küçük ölçekler işe yarar.

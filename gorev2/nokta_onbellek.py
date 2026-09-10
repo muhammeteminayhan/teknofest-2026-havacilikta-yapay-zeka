@@ -101,17 +101,26 @@ YATAKLAR = {
         gt_csv=VERI25 / "Ornek-Veri-2-RGB-translation.csv",
         profile=RGB_4K_VIDEO, ek="raft_v25rgbb",
     ),
+    # !!! TERMAL CSV'LERI VERI SETINDE CAPRAZ ADLANDIRILMIS !!!
+    # Her termal video, KENDI adindaki CSV ile DEGIL, digeriyle eslesiyor.
+    # Olcumle kanitlandi — birim yatay olcum |E| ile GT yatay adim |G| korelasyonu:
+    #     Ornek-Veri-1-Termal.MP4 : kendi CSV'si 0,031  ·  Veri-2-Termal CSV'si 0,719
+    #     Ornek-Veri-2-Termal.MP4 : kendi CSV'si -0,013 ·  Veri-1-Termal CSV'si 0,523
+    # (Kiyas: RGB videolari kendi CSV'leriyle 0,987 ve 0,841 veriyor.)
+    # Capraz dogrulama: Veri-1-Termal, Veri-1-RGB CSV'siyle de 0,717 veriyor -> ayni
+    # ucus; yani A ucusu = RGB-1 + Termal-1, B ucusu = RGB-2 + Termal-2 ve yalniz
+    # TERMAL CSV adlari takas edilmis.
     "v25_termal_a": dict(
-        ad="2025 TERMAL · A ucusu (Ornek-Veri-2-Termal)",
-        video=VERI25 / "Ornek-Veri-2-Termal.MP4",
-        gt_csv=VERI25 / "Ornek-Veri-2-Termal-translation.csv",
-        profile=THERMAL, ek="raft_v25terma",
+        ad="2025 TERMAL · A ucusu (Ornek-Veri-1-Termal videosu)",
+        video=VERI25 / "Ornek-Veri-1-Termal.MP4",
+        gt_csv=VERI25 / "Ornek-Veri-2-Termal-translation.csv",   # capraz!
+        profile=THERMAL, ek="raft_v25termb",                     # onbellek videoya bagli
     ),
     "v25_termal_b": dict(
-        ad="2025 TERMAL · B ucusu (Ornek-Veri-1-Termal)",
-        video=VERI25 / "Ornek-Veri-1-Termal.MP4",
-        gt_csv=VERI25 / "Ornek-Veri-1-Termal-translation.csv",
-        profile=THERMAL, ek="raft_v25termb",
+        ad="2025 TERMAL · B ucusu (Ornek-Veri-2-Termal videosu)",
+        video=VERI25 / "Ornek-Veri-2-Termal.MP4",
+        gt_csv=VERI25 / "Ornek-Veri-1-Termal-translation.csv",   # capraz!
+        profile=THERMAL, ek="raft_v25terma",                     # onbellek videoya bagli
     ),
     # --- 2024 ornek veri: ZAYIF ama bagimsiz bir yatay-kanal sinavi ---
     # Sinirlari (dogrudan olculdu):
@@ -294,6 +303,54 @@ def olcum_uret(ob: dict, profile: CameraProfile = RGB_1080P,
     return pd.DataFrame(satirlar)
 
 
+def yatak_dogrula(yatak_adi: str, tracker: str = "raft") -> float:
+    """Yatagin GT'si ile GORUNTUSU gercekten ayni ucusa mi ait? Korelasyonu dondurur.
+
+    NEDEN VAR — 8 Agu 2026'da bulunan sessiz hata: 2025 veri setinde termal CSV'ler
+    capraz adlandirilmis; her termal video KENDI adindaki CSV yerine digeriyle
+    eslesiyordu. Bu, iki "bagimsiz yatagi" tamamen anlamsiz hale getirmisti ve
+    "sistem hicbir sey yapmamaktan kotu" gibi YANLIS bir bulguya yol acmisti.
+
+    Tuzagin sinsi yani: "tum kareler saglikli" kosusunda hata yine 0,0000 cikar
+    (saglikli karede GT aynen geri gonderilir), yani o kontrol bu hatayi YAKALAMAZ.
+    Yakalayan tek sey, GORSEL OLCUMUN GT ile korelasyonudur.
+
+    Olcut: birim yatay olcum |E| ile ayni ciftin GT yatay adimi |G| korelasyonu.
+    Saglikli yataklarda 0,52-0,99; eslesmesi bozuk yatakta ~0,00.
+    """
+    y = YATAKLAR[yatak_adi]
+    adim = 1 if "kareler" in y else data_io.FRAME_STEP
+    gt, cons, _, _, n = yatak_yukle(yatak_adi, n_kare=None, tracker=tracker)
+    gt, d = gt[:n], cons.iloc[:n - 1]
+    nn = d[["hom_nx", "hom_ny", "hom_nz"]].to_numpy()
+    dl = d[["hom_ux", "hom_uy", "hom_uz"]].to_numpy()
+    dzu = (nn * dl).sum(1)
+    E = np.linalg.norm((dl - dzu[:, None] * nn)[:, :2], axis=1)
+    i0 = np.clip(d.idx0.to_numpy() // adim, 0, n - 1)
+    i1 = np.clip(d.idx1.to_numpy() // adim, 0, n - 1)
+    G = np.linalg.norm(gt[i1, :2] - gt[i0, :2], axis=1)
+    m = d.hom_ok.to_numpy() & (~d.frozen.to_numpy()) & np.isfinite(E)
+    if m.sum() < 50 or np.std(G[m]) < 1e-9:
+        return float("nan")
+    return float(np.corrcoef(E[m], G[m])[0, 1])
+
+
+def yataklari_dogrula(yataklar=None, tracker: str = "raft", esik: float = 0.35,
+                      sessiz: bool = False) -> list[str]:
+    """Butun yataklarin eslesmesini denetle; supheli olanlarin listesini dondur."""
+    supheli = []
+    for y in (yataklar or [k for k in YATAKLAR
+                           if yatak_npz(k, None, tracker).exists()
+                           and yatak_npz(k, 8, tracker).exists()]):
+        k = yatak_dogrula(y, tracker)
+        if not (k > esik):
+            supheli.append(y)
+        if not sessiz:
+            print(f"  {y:<15}{tracker:<6} kor={k:>6.3f}  "
+                  f"{'OK' if k > esik else '>>> ESLESME SUPHELI <<<'}")
+    return supheli
+
+
 def yatak_yukle(yatak_adi: str, spacing: int = 8, n_kare: int | None = 2250,
                 tohum: int | None = 0, karistir: int | None = None,
                 geo_merdiven: dict | None = None, tracker: str = "raft",
@@ -342,6 +399,16 @@ def _tracker_kur(ad: str, profile, downscale=None, on_isle=None, grid_step=28,
         return RaftTracker(profile, model_size="large", downscale=downscale,
                            on_isle=on_isle, grid_step=grid_step,
                            hedef_nokta=hedef_nokta)
+    if ad.startswith("searaft"):
+        # SEA-RAFT: RAFT ile BIREBIR ayni ornekleme/eleme, yalniz akis agi degisir.
+        from gorev2_src.searaft_matching import SeaRaftTracker, VARYANTLAR
+        if ad not in VARYANTLAR:
+            raise SystemExit(f"bilinmeyen SEA-RAFT varyanti: {ad} "
+                             f"(secenekler: {', '.join(VARYANTLAR)})")
+        v = VARYANTLAR[ad]
+        return SeaRaftTracker(profile, agirlik=v["agirlik"], cfg_adi=v["cfg"],
+                              iters=v["iters"], downscale=downscale, on_isle=on_isle,
+                              grid_step=grid_step, hedef_nokta=hedef_nokta)
     if ad == "lk":
         from gorev2_src.matching import FeatureTracker
         return FeatureTracker(profile)
