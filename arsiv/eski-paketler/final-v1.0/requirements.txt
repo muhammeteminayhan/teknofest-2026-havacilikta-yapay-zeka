@@ -1,0 +1,30 @@
+# TEKNOFEST 2026 — Havacilikta Yapay Zeka | Bagimliliklar
+# Asagidaki surumler yarismada KULLANILAN ve test edilen surumlerdir.
+#
+# ==========================================================================
+# ONEMLI: torch / torchvision bu dosyayla KURULMAZ.
+# Once asagidaki komutla CUDA surumunu kurun (detay: README.md "Kurulum"):
+#
+#   python -m pip install torch==2.11.0 torchvision==0.26.0 \
+#       --index-url https://download.pytorch.org/whl/cu128
+#
+# Test edilen: torch 2.11.0+cu128 / torchvision 0.26.0+cu128 (CUDA 12.8).
+# CPU-only bir makinede duz "pip install torch torchvision" de calisir; sistem
+# GPU yoksa CPU'ya duser, ancak kare basi sure yarisma butcesini asabilir.
+# ==========================================================================
+
+# --- cekirdek ---
+numpy==2.4.6
+opencv-python==4.11.0.86
+scipy==1.18.0                 # gorev3: heatmap olcekleme (ndimage.zoom / gaussian_filter)
+PyYAML==6.0.3                 # gorev3: template_config.yaml
+requests==2.34.2              # sunucu iletisimi
+python-decouple==3.8          # config/.env okuma
+tqdm==4.68.3                  # main.py ilerleme cubugu
+
+# --- modeller ---
+ultralytics==8.4.92           # Gorev 1: YOLO cikarimi + BoT-SORT takibi
+                              # (STANDART surum; ozel fork GEREKMEZ — DINOv3 govde
+                              #  modulu gorev1/dinov3_modul.py icinde paketlidir)
+transformers==5.13.0          # Gorev 3: DINOv3 omurgasi (AutoModel)
+# torchvision  -> Gorev 2: RAFT optik akis modeli (yukaridaki CUDA komutuyla kurulur)

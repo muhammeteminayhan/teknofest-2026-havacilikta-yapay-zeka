@@ -1,0 +1,62 @@
+# config.yaml
+
+# ── Model & Backbone Settings ──
+model:
+  yolo_weights: "yolov8-dinov3.yaml"
+  dino_size: "small"              # Options: "small", "base", "large", "giant"
+  patch_size: 16                  # DINOv3 patch size (DINOv2 icin 14). _preprocess omurgadan okur.
+
+# ── Ultralytics Predict Settings (YOLO Detection) ──
+yolo_predict:
+  conf: 0.25                      # Object confidence threshold for detection
+  iou: 0.7                        # Intersection over Union (IoU) threshold for NMS
+  imgsz: 640                      # Image size for inference (scalar or list)
+  half: false                     # Use half precision (FP16)
+  device: ""                      # Device to run on (e.g. 'cuda:0', 'cpu', or '' for auto)
+  max_det: 300                    # Maximum number of detections per image
+  classes: null                   # Filter by class (list of class indices)
+  agnostic_nms: false             # Class-agnostic NMS
+  save: false                     # Save predicted images/videos
+  show: false                     # Show predicted images/videos
+  verbose: false                  # Print verbose output during prediction
+
+# ── Feature Pyramid Network (FPN) Settings ──
+fpn:
+  levels:                         # 16'nin (DINOv3 patch) CARPANLARI olmali. Yuksek-res:
+    P3: 672                       # Fine  (16x42) - minik nesne icin yuksek cozunurluk
+    P4: 448                       # Medium (16x28)
+    P5: 224                       # Coarse (16x14) - baglam
+  fusion_method: "max"            # Options: "max", "mean", "weighted"
+  fusion_weights: [0.5, 0.3, 0.2] # Only used if fusion_method is "weighted"
+  upsample_order: 1               # Interpolation order (1 = bilinear)
+
+# ── Tiling (SAHI: buyuk goruntude MINIK nesne) ──
+# Sahneyi ortusen karolara bolup her karoda ara -> minik nesne karo icinde buyur.
+tiling:
+  enabled: true                   # false -> eski tek-gecis davranis (buyuk nesneler icin)
+  tile_size: 640                  # karo boyutu (px). 1920x1080 -> ~4x2 karo
+  overlap: 0.2                    # karolar arasi ortusme orani (SAHI onerisi)
+
+# ── Template Reference Registration ──
+reference:
+  augment: false                  # Enable horizontal/vertical flips and scale jittering
+  augment_scales: [0.9, 1.1]      # Scale multipliers for jittering
+
+# ── Detection & BBox Extraction (Template Matcher) ──
+matching:
+  # --- Esik yontemi: "statistical" (onerilen) | "ratio" (eski) ---
+  threshold_method: "statistical" # istatistiksel: tepe arka plandan anlamli yuksek mi bak
+  k_std: 3.0                      # gecerli tespit sarti: max_val > mean + k_std*std
+  box_k_std: 2.0                  # kutu esigi: mean + box_k_std*std
+  max_box_area_ratio: 0.55        # kutu kare alaninin > %55'ini kapliyorsa REDDET (whole-image guard)
+  # --- ortak / "ratio" yonteminin parametreleri (geri uyum) ---
+  cls_threshold: 0.3              # Threshold for early rejection (if _cls_filter is ever re-enabled)
+  min_confidence: 0.1            # Minimum absolute similarity to trigger a valid detection
+  threshold_ratio: 0.60           # ("ratio") heatmap'i tepenin %60'inda kes
+  noise_floor: 0.15               # ("ratio") mutlak alt esik
+  
+  morphology:
+    kernel_shape: "ellipse"       # Options: "ellipse", "rect", "cross"
+    kernel_size: 9                # Kernel size for Morphological closing
+
+  nms_iou_threshold: 0.5          # Non-Maximum Suppression overlap threshold

@@ -1,0 +1,8 @@
+Gorev 1 model agirligi (best.pt) bu klasore konulacaktir.
+
+Dosya boyut siniri nedeniyle ZIP'e dahil edilmemistir; kok dizindeki
+model.txt icindeki Google Drive baglantisindan indirilir.
+
+Beklenen yol:  gorev1/agirliklar/best.pt
+
+Dogrulama:     python dogrula.py   (kok dizinde)

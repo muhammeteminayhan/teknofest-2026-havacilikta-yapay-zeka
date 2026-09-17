@@ -1,0 +1,65 @@
+TEKNOFEST 2026 — HAVACILIKTA YAPAY ZEKA
+MODEL DOSYALARI
+================================================================================
+
+Model dosyalari toplam ~168 MB oldugu ve T3 KYS'nin dosya basina 100 MB sinirini
+astigi icin Google Drive uzerinden paylasilmistir.
+
+GOOGLE DRIVE BAGLANTISI:
+https://drive.google.com/drive/folders/1vvt5HzlJhV3CCvqmARU8y2-GXlIJvIpl?usp=drive_link
+Erisim izni verilen adres: havaciliktayapayzekayarismasi@teknofest.org
+
+
+--------------------------------------------------------------------------------
+1) INDIRILEN DOSYALAR VE YERLESTIRILECEKLERI KONUMLAR
+--------------------------------------------------------------------------------
+
+Drive klasorunde 3 ogesi vardir:
+
+  [1] best.pt                                    (~65 MB)  — Gorev 1, kendi egitimimiz
+      HEDEF:  gorev1/agirliklar/best.pt
+      (bu ZIP'in icindeki gorev1/agirliklar/ klasorunun altina konur)
+
+  [2] raft_large_C_T_SKHT_V2-ff5fadd5.pth        (~20 MB)  — Gorev 2, RAFT optik akis
+      HEDEF:  Windows : C:\Users\<KULLANICI>\.cache\torch\hub\checkpoints\
+              Linux   : ~/.cache/torch/hub/checkpoints/
+
+  [3] models--facebook--dinov3-vits16-pretrain-lvd1689m/   (~83 MB, KLASOR)
+                                                 — Gorev 1 ve 3, DINOv3 omurgasi
+      HEDEF:  Windows : C:\Users\<KULLANICI>\.cache\huggingface\hub\
+              Linux   : ~/.cache/huggingface/hub/
+      (klasorun tamami oldugu gibi kopyalanir)
+
+
+--------------------------------------------------------------------------------
+2) NEDEN [2] ve [3] PAKETLENDI?
+--------------------------------------------------------------------------------
+
+Bu iki model normalde ilk calistirmada internetten otomatik iner. Yine de pakete
+dahil edildiler:
+
+  * DINOv3 (facebook/dinov3-vits16-pretrain-lvd1689m) HuggingFace uzerinde
+    ERISIM ONAYI GEREKTIREN (gated) bir modeldir. Onay alinmamis bir hesapta
+    otomatik indirme 401 ile basarisiz olur. Yerel kopya bu riski ortadan kaldirir.
+
+  * Yarisma ortaminda internet erisimi garanti degildir. Her iki dosya da yerine
+    konuldugunda sistem tamamen CEVRIMDISI calisir.
+
+
+--------------------------------------------------------------------------------
+3) DOSYALAR YERINE KONULMAZSA NE OLUR?
+--------------------------------------------------------------------------------
+
+  [1] best.pt YOKSA        -> Gorev 1 calismaz (agirlik dosyasi zorunludur).
+
+  [2] RAFT YOKSA           -> Sistem cokmez; Gorev 2 otomatik olarak klasik
+                              Lucas-Kanade optik akisina duser (log'a
+                              "RAFT kurulamadi; LK yedegine geciliyor" yazar).
+                              Ancak konum kestirim dogrulugu belirgin duser.
+
+  [3] DINOv3 YOKSA         -> Gorev 3 baslatilamaz (log'a uyari yazilir, Gorev 1
+                              ve 2 calismaya devam eder). Gorev 1'in agirligi da
+                              DINOv3 govdeli oldugu icin [1] ile birlikte gereklidir.
+
+Dogrulama: kurulum sonrasi README.md'deki "Kurulum dogrulamasi" komutu calistirilir;
+uc gorevin de yuklendigi ve motor=raft secildigi ekrana yazilir.
