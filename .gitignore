@@ -60,5 +60,31 @@ data/
 VIDEO_SENARYO.md
 VIDEO_SENARYO_GOREV3.md
 VIDEO_YAYIN_BILGILERI.md
-video_gorseller/
+video_gorseller/*
 mimari_slayt.png
+
+# --- trial-8 egitim agirliklari (206 MB x2 — GitHub 100 MB sinirini asar) ---
+# args.yaml, results.csv ve egitim grafikleri KALIR: sevk edilen agirligin
+# kaynagini (mAP 0,814 · 127. donem · imgsz 1280) belgeleyen kayit onlardir.
+# Agirligin kendisi calisir pakette durur: final-diyarbakir/gorev1/agirliklar/best.pt
+trial-8/weights/
+
+# --- Ucuncu taraf klon (SEA-RAFT turu; kendi .git'i var, denendi ve elendi) ---
+vendor/
+
+# --- Rapor uretim artigi (PDF'ten cikarilmis ham metin, denetim icin) ---
+docs/_rapor_metin.txt
+
+# --- Rapordaki sekillerin kaynagi: video_gorseller yok sayiliyor ama FTR'nin
+#     kullandigi bes sema haric tutuluyor ki docs/ftr_uret.py klondan calissin.
+!video_gorseller/S1_sistem_akisi.png
+!video_gorseller/A1_gorev1_akis.png
+!video_gorseller/B2_gorev2_akis.png
+!video_gorseller/C1_gorev3_akis.png
+!video_gorseller/B3_raft.png
+
+# --- Gorev 2 final yeniden degerlendirme: COLMAP ara verisi (12 GB, yeniden uretilir) ---
+# Disa aktarilan JPEG kareler + SfM modelleri. Sonuc dosyalari (txt/json/npz/png) KALIR:
+# final_degerlendirme.json ve orb_yataklar.txt bulgularin kaydidir.
+gorev2/outputs/final/colmap/
+gorev2/outputs/final/*.log

@@ -91,6 +91,23 @@ def ayar_uygula(m, ayar: str | None):
             v = deg.strip()
         dugum[anahtarlar[-1]] = v
         uygulanan[yol.strip()] = v
+    # DIKKAT — SESSIZ TUZAK: TemplateMatcher.__init__ bazi ayarlari config'ten
+    # KOPYALAYIP kendi ozniteliginde tutuyor (cls_threshold, min_confidence,
+    # threshold_ratio, noise_floor, fusion, augment). Sadece config sozlugunu
+    # degistirmek bunlari ETKILEMIYOR; bu yuzden 10 Eyl 2026'da yapilan bir
+    # min_confidence taramasi bes farkli degerde de AYNI sonucu verdi ve
+    # "ayar etkisiz" gibi gorundu. Kopyalanan oznitelikler burada tazeleniyor.
+    _m = m.matcher
+    for _ad, _yol in (("cls_threshold", ("matching", "cls_threshold")),
+                      ("min_confidence", ("matching", "min_confidence")),
+                      ("threshold_ratio", ("matching", "threshold_ratio")),
+                      ("noise_floor", ("matching", "noise_floor")),
+                      ("fusion", ("fpn", "fusion_method")),
+                      ("augment", ("reference", "augment"))):
+        try:
+            setattr(_m, _ad, _m.config[_yol[0]][_yol[1]])
+        except KeyError:
+            pass
     return uygulanan
 
 

@@ -1,0 +1,9 @@
+GOREV 2 — TEMMUZ vs SEVK · video1 (RGB 1080p) · 2256 kare
+kesinti takvimi: [(451, 900), (1051, 1550), (1651, 2250)]
+
+resmi (tum kareler)    TEMMUZ     3.871   SEVK     3.760   fark    -0.111
+kesinti kareleri       TEMMUZ     5.645   SEVK     5.483   fark    -0.163
+kesinti medyan         TEMMUZ     4.847   SEVK     5.153   fark    +0.306
+kesinti p95            TEMMUZ    10.241   SEVK    10.062   fark    -0.179
+en kotu kare           TEMMUZ    11.421   SEVK    11.478   fark    +0.057
+kare basi [ms]         TEMMUZ   624.855   SEVK   622.367   fark    -2.488

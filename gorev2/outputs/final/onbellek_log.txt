@@ -1,0 +1,21 @@
+final_o4 cons uretiliyor...
+  THYZ_2026_Oturum4_aavwo: kare 0/2250
+  THYZ_2026_Oturum4_aavwo: kare 250/2250
+  THYZ_2026_Oturum4_aavwo: kare 500/2250
+  THYZ_2026_Oturum4_aavwo: kare 750/2250
+  THYZ_2026_Oturum4_aavwo: kare 1000/2250
+  THYZ_2026_Oturum4_aavwo: kare 1250/2250
+  THYZ_2026_Oturum4_aavwo: kare 1500/2250
+  THYZ_2026_Oturum4_aavwo: kare 1750/2250
+  THYZ_2026_Oturum4_aavwo: kare 2000/2250
+2249 cift, 1420436 nokta, 834 s, 10.1 MB -> nokta_raft_final_o4_cons.npz
+final_o4 sp8 uretiliyor...
+  THYZ_2026_Oturum4_aavwo: kare 0/2250
+  THYZ_2026_Oturum4_aavwo: kare 250/2250
+  THYZ_2026_Oturum4_aavwo: kare 500/2250
+  THYZ_2026_Oturum4_aavwo: kare 750/2250
+  THYZ_2026_Oturum4_aavwo: kare 1000/2250
+  THYZ_2026_Oturum4_aavwo: kare 1250/2250
+  THYZ_2026_Oturum4_aavwo: kare 1500/2250
+  THYZ_2026_Oturum4_aavwo: kare 1750/2250
+  THYZ_2026_Oturum4_aavwo: kare 2000/2250

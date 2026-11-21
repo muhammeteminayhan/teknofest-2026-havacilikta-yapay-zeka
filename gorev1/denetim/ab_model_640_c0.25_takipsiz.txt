@@ -3,27 +3,27 @@
 uretim yolu: Gorev1Detector + BoT-SORT takip (ikisi de ayni)
 
                           MEVCUT      ADAY
-toplam tespit                324       337
-bos kare                      15        12
-ms/kare                       34        37
-ultralytics               8.4.92    8.4.80
+toplam tespit                337       374
+bos kare                      12        11
+ms/kare                       45       125
+ultralytics               8.4.92    8.4.92
 
 --- sinif bazinda tespit ---
 sinif        MEVCUT     ADAY    ortak  yalniz aday  gercek kayip
-Tasit           236      286      232           54             4
-Insan            64       20        0           20            28
-UAP              12       24       12           12             0
-UAI              12        7        0            7            12
+Tasit           286      289      282            7             3
+Insan            20       54        1           53            17
+UAP              24       12       12            0            12
+UAI               7       19        5           14             2
 
-yer degistirme (olcum artefakti, kayip DEGIL): 36
+yer degistirme (olcum artefakti, kayip DEGIL): 3
 
 --- olcutler (ab_cozunurluk.py ile ayni) ---
-[OK ] net kazanc: +93 yalniz-aday / -44 gercek kayip
-[RED] kayip orani: %13.6 (esik %10)
-[OK ] yeni tespit boyutu: medyan 9991 px2 (100x100) — esik 1600 px2
-[OK ] sure butcesi: 37 ms <= 2400 ms
-[OK ] bos kare azaldi mi: 15 -> 12
+[OK ] net kazanc: +74 yalniz-aday / -34 gercek kayip
+[RED] kayip orani: %10.1 (esik %10)
+[RED] yeni tespit boyutu: medyan 1143 px2 (34x34) — esik 1600 px2
+[OK ] sure butcesi: 125 ms <= 2400 ms
+[OK ] bos kare azaldi mi: 12 -> 11
 
 >>> TAVSIYE: MEVCUT model kalsin — aday yukaridaki RED olcutlerinden kaldi.
 
-gorsel kanit: 0 panel -> denetim/ab_model_*.png
+gorsel kanit: 6 panel -> denetim/ab_model_*.png

@@ -17,6 +17,7 @@ Sınıf uzlaşımı (model ↔ şartname):
 from __future__ import annotations
 
 import logging
+import unicodedata
 import sys
 from pathlib import Path
 from typing import Optional
@@ -44,6 +45,52 @@ def _dinov3_enjekte() -> None:
     import ultralytics.nn.modules as _M
     import ultralytics.nn.tasks as _T
     _M.DINOv3 = _T.DINOv3 = dinov3_modul.DINOv3
+
+
+# --------------------------------------------------------------- sinif eslemesi
+# Sartname sinif indeksleri (sistem/src/constants.py — "DEGISIKLIK YAPMAYINIZ"):
+SPEC_SINIFLAR = {"tasit": 0, "insan": 1, "uap": 2, "uai": 3}
+
+
+def _sinif_anahtari(ad: str) -> str:
+    """Sinif adini karsilastirilabilir anahtara indir: 'UAI' ve 'UAI' ayni anahtar.
+
+    Turkce karakterler ASCII'ye indirgenir. Python'da "I".lower() birlesik bir
+    aksan uretir (i + U+0307), bu yuzden once acik degistirme sonra NFKD ile
+    aksan atma yapilir.
+    """
+    t = str(ad).replace("ı", "i").replace("İ", "i").replace("I", "i")
+    t = unicodedata.normalize("NFKD", t)
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return "".join(c for c in t.lower() if c.isalnum())
+
+
+def spec_sinif_eslemesi(names) -> dict:
+    """Agirligin kendi sinif ADLARINDAN sartname indeks eslemesini kur.
+
+    NEDEN ISIMDEN, sabit takasla degil: agirliklar arasinda sinif SIRASI degisiyor.
+        best_dinov3.pt / best.pt : 2=UAI, 3=UAP   -> sartnameye gore TERS
+        trial-8/weights/best.pt  : 2=UAP, 3=UAI   -> sartnameyle AYNI
+    Eski kodda sabit bir 2<->3 takasi vardi; o takas AGIRLIGA BAGIMLIYDI ve yanlis
+    agirlikla sessizce UAP ile UAI'yi birbirine yazip iki sinifi da sifirlardi.
+    Isimden esleme hangi agirlik gelirse gelsin dogru calisir.
+
+    Eslenemeyen ya da eksik bir tablo HATA firlatir — sessizce yanlis etiketlemektense
+    kurulum aninda cokmek dogrudur.
+    """
+    esleme: dict = {}
+    for idx, ad in dict(names).items():
+        anahtar = _sinif_anahtari(ad)
+        if anahtar not in SPEC_SINIFLAR:
+            raise ValueError(
+                f"Bilinmeyen sinif adi: {ad!r} (anahtar {anahtar!r}). "
+                f"Beklenen adlar: {sorted(SPEC_SINIFLAR)}")
+        esleme[int(idx)] = SPEC_SINIFLAR[anahtar]
+    if sorted(esleme.values()) != sorted(SPEC_SINIFLAR.values()):
+        raise ValueError(
+            f"Sinif eslemesi eksik ya da cakisik: {esleme} "
+            f"(sartname 4 sinif bekliyor: {SPEC_SINIFLAR})")
+    return esleme
 
 
 def _calculate_homography(prev_frame: np.ndarray, curr_frame: np.ndarray) -> np.ndarray:
@@ -82,35 +129,42 @@ class Gorev1Detector:
     ego-hareket telafili hareket durumu, iniş uygunluğu, takip, UAP/UAİ sınıf takası.
     """
 
-    # imgsz=640: DINOv3 gövdeli model 640'ta EGITILDI (checkpoint train_args) ve ViT
-    # tabanli govdeler egitim cozunurlugunden uzaklasinca bozulur. A/B ile dogrulandi
-    # (ab_model.py, 74 gercek yarisma karesi, ayni uretim yolu):
-    #   640  : net +86 yalniz-aday / -36 gercek kayip, bos kare 15 -> 12
-    #   1280 : net +40 / -56 — belirgin daha kotu
-    # (Onceki vanilla YOLOv8s icin 1280 en iyiydi: +97/-10. Model degisince optimum da
-    #  degisti; eski gerekce artik gecerli degil.)
+    # imgsz=1280: SEVK EDILEN trial-8 agirligi 1280'de EGITILDI — kaynak iki yerde
+    # birden dogrulandi (trial-8/args.yaml ve checkpoint'in kendi train_args'i). ViT
+    # tabanli govdeler egitim cozunurlugunden uzaklasinca bozuldugu icin bu zorunlu.
+    #
+    # DIKKAT — eski gerekce ARTIK GECERLI DEGIL: onceki agirlik (best_dinov3.pt) 640'ta
+    # egitilmisti ve o donemde A/B ile 640 secilmisti (640: +86/-36 · 1280: +40/-56).
+    # MODEL DEGISTI, optimum da degisti. Ayrinti: denetim/MODEL_DEGISIMI.md
     def __init__(self, weights_path: Optional[str] = None, motion_thresh: float = 5.0,
-                 conf: float = 0.25, iou: float = 0.7, imgsz: int = 640):
+                 conf: float = 0.25, iou: float = 0.7, imgsz: int = 1280):
         from ultralytics import YOLO  # standart pip surumu (fork DEGIL)
 
         self.weights = str(weights_path or BEST_PT)
-        if "dinov3" in Path(self.weights).name.lower():
-            _dinov3_enjekte()
+        # Enjeksiyon KOSULSUZ: agirlik pakette "best.pt" adiyla dagitiliyor ve
+        # dosya adina bakan eski kosul enjeksiyonu HIC tetiklemiyordu.
+        _dinov3_enjekte()
         self.model = YOLO(self.weights)
         self.motion_thresh = motion_thresh
         self.conf, self.iou, self.imgsz = conf, iou, imgsz
         self._prev_frame: Optional[np.ndarray] = None
         self._prev_centroids: dict = {}   # track_id -> (cx, cy)
-        logging.info(f"Gorev1Detector hazir: {self.weights} | siniflar={self.model.names}")
+        self._cls_map = spec_sinif_eslemesi(self.model.names)
+        logging.info(f"Gorev1Detector hazir: {self.weights} | imgsz={self.imgsz} | "
+                     f"model siniflari={self.model.names} | "
+                     f"sartname eslemesi={self._cls_map}")
 
-    @staticmethod
-    def _spec_cls(model_cls: int) -> int:
-        """Model sınıfını şartname sınıfına çevir (UAP/UAİ takası)."""
-        if model_cls == 2:
-            return 3      # model UAİ -> spec 3 (UAİ)
-        if model_cls == 3:
-            return 2      # model UAP -> spec 2 (UAP)
-        return model_cls  # 0 Taşıt, 1 İnsan
+    def spec_cls(self, model_cls: int) -> int:
+        """Model sınıf indeksini şartname indeksine çevir.
+
+        Eşleme ağırlığın KENDİ sınıf adlarından kurulur (bkz. `spec_sinif_eslemesi`),
+        sabit bir takas değildir.
+        """
+        try:
+            return self._cls_map[int(model_cls)]
+        except KeyError:
+            raise ValueError(f"Model {model_cls} sinifini uretti ama esleme "
+                             f"tablosunda yok: {self._cls_map}") from None
 
     def detect(self, frame_bgr: np.ndarray) -> list[dict]:
         """Bir kareyi işle; şartname şemasında nesne sözlükleri listesi döndür."""
@@ -134,7 +188,7 @@ class Gorev1Detector:
                    else np.full(len(xyxy), -1.0))
             for box, track_id, cls in zip(xyxy, ids, clss):
                 x1, y1, x2, y2 = map(int, box)
-                spec_cls = self._spec_cls(int(cls))
+                spec_cls = self.spec_cls(int(cls))
                 obj = {"cls": str(spec_cls), "landing_status": "-1", "motion_status": "-1",
                        "top_left_x": x1, "top_left_y": y1,
                        "bottom_right_x": x2, "bottom_right_y": y2}

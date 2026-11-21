@@ -1,0 +1,22 @@
+video1: ORB-SLAM3 izleme orani %100, harita sayisi 1
+  cevrimici  RAFT    3.87 | ORB+Umeyama    2.52 | HIBRIT b0    3.61 b0.05    3.91 b0.10    4.18
+  final      RAFT   12.46 | ORB+Umeyama    6.45 | HIBRIT b0   10.32 b0.05    9.50 b0.10   12.43
+video2: ORB-SLAM3 izleme orani %99, harita sayisi 1
+  cevrimici  RAFT   10.24 | ORB+Umeyama   15.48 | HIBRIT b0   10.41 b0.05   10.14 b0.10    9.47
+  final      RAFT   46.82 | ORB+Umeyama   24.89 | HIBRIT b0   12.98 b0.05   13.36 b0.10   13.79
+v25_rgb_a: ORB-SLAM3 izleme orani %90, harita sayisi 1
+  cevrimici  RAFT    3.44 | ORB+Umeyama    2.35 | HIBRIT b0    1.88 b0.05    1.86 b0.10    2.30
+  final      RAFT    1.76 | ORB+Umeyama    5.26 | HIBRIT b0    1.77 b0.05    2.29 b0.10    3.34
+v25_rgb_b: ORB-SLAM3 izleme orani %99, harita sayisi 1
+  cevrimici  RAFT    8.96 | ORB+Umeyama    9.58 | HIBRIT b0    9.75 b0.05    9.55 b0.10    8.92
+  final      RAFT   44.03 | ORB+Umeyama   17.37 | HIBRIT b0   43.87 b0.05   40.84 b0.10   39.76
+v25_termal_a: ORB-SLAM3 izleme orani %91, harita sayisi 1
+  cevrimici  RAFT    4.04 | ORB+Umeyama    4.42 | HIBRIT b0    3.85 b0.05    3.86 b0.10    4.13
+  final      RAFT    6.39 | ORB+Umeyama   35.37 | HIBRIT b0   12.69 b0.05   13.30 b0.10   14.81
+v25_termal_b: ORB-SLAM3 izleme orani %93, harita sayisi 5
+  cevrimici  RAFT    8.21 | ORB+Umeyama   45.83 | HIBRIT b0    9.27 b0.05    9.04 b0.10    8.78
+  final      RAFT   49.41 | ORB+Umeyama   61.96 | HIBRIT b0   70.21 b0.05   68.10 b0.10   64.30
+ORTALAMA (12 yatak-takvim): RAFT 16.64 | ORB+Umeyama 19.29 | hibrit b0 15.88 | b0.05 15.48 | b0.10 15.52
+  hibrit b0: 6/12 yatak-takvimde RAFT'tan iyi | en kotu +98%
+  hibrit b0.05: 6/12 yatak-takvimde RAFT'tan iyi | en kotu +108%
+  hibrit b0.10: 6/12 yatak-takvimde RAFT'tan iyi | en kotu +132%

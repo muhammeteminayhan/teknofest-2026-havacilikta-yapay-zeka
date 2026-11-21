@@ -1,0 +1,100 @@
+final_o4 cons: zaten var
+final_o4 sp8 uretiliyor...
+  THYZ_2026_Oturum4_aavwo: kare 0/2250
+  THYZ_2026_Oturum4_aavwo: kare 250/2250
+  THYZ_2026_Oturum4_aavwo: kare 500/2250
+  THYZ_2026_Oturum4_aavwo: kare 750/2250
+  THYZ_2026_Oturum4_aavwo: kare 1000/2250
+  THYZ_2026_Oturum4_aavwo: kare 1250/2250
+  THYZ_2026_Oturum4_aavwo: kare 1500/2250
+  THYZ_2026_Oturum4_aavwo: kare 1750/2250
+  THYZ_2026_Oturum4_aavwo: kare 2000/2250
+2249 cift, 1188029 nokta, 1300 s, 8.6 MB -> nokta_raft_final_o4_sp8.npz
+final_o1 cons uretiliyor...
+  THYZ_2026_Oturum1_alvsb: kare 0/2250
+  THYZ_2026_Oturum1_alvsb: kare 250/2250
+  THYZ_2026_Oturum1_alvsb: kare 500/2250
+  THYZ_2026_Oturum1_alvsb: kare 750/2250
+  THYZ_2026_Oturum1_alvsb: kare 1000/2250
+  THYZ_2026_Oturum1_alvsb: kare 1250/2250
+  THYZ_2026_Oturum1_alvsb: kare 1500/2250
+  THYZ_2026_Oturum1_alvsb: kare 1750/2250
+  THYZ_2026_Oturum1_alvsb: kare 2000/2250
+2249 cift, 1427723 nokta, 1277 s, 10.2 MB -> nokta_raft_final_o1_cons.npz
+final_o1 sp8 uretiliyor...
+  THYZ_2026_Oturum1_alvsb: kare 0/2250
+  THYZ_2026_Oturum1_alvsb: kare 250/2250
+  THYZ_2026_Oturum1_alvsb: kare 500/2250
+  THYZ_2026_Oturum1_alvsb: kare 750/2250
+  THYZ_2026_Oturum1_alvsb: kare 1000/2250
+  THYZ_2026_Oturum1_alvsb: kare 1250/2250
+  THYZ_2026_Oturum1_alvsb: kare 1500/2250
+  THYZ_2026_Oturum1_alvsb: kare 1750/2250
+  THYZ_2026_Oturum1_alvsb: kare 2000/2250
+2249 cift, 1213916 nokta, 1700 s, 8.8 MB -> nokta_raft_final_o1_sp8.npz
+final_o3 cons uretiliyor...
+  THYZ_2026_Oturum3_akrid: kare 0/2250
+  THYZ_2026_Oturum3_akrid: kare 250/2250
+  THYZ_2026_Oturum3_akrid: kare 500/2250
+  THYZ_2026_Oturum3_akrid: kare 750/2250
+  THYZ_2026_Oturum3_akrid: kare 1000/2250
+  THYZ_2026_Oturum3_akrid: kare 1250/2250
+  THYZ_2026_Oturum3_akrid: kare 1500/2250
+  THYZ_2026_Oturum3_akrid: kare 1750/2250
+  THYZ_2026_Oturum3_akrid: kare 2000/2250
+2249 cift, 880417 nokta, 983 s, 6.3 MB -> nokta_raft_final_o3_cons.npz
+final_o3 sp8 uretiliyor...
+  THYZ_2026_Oturum3_akrid: kare 0/2250
+  THYZ_2026_Oturum3_akrid: kare 250/2250
+  THYZ_2026_Oturum3_akrid: kare 500/2250
+  THYZ_2026_Oturum3_akrid: kare 750/2250
+  THYZ_2026_Oturum3_akrid: kare 1000/2250
+  THYZ_2026_Oturum3_akrid: kare 1250/2250
+  THYZ_2026_Oturum3_akrid: kare 1500/2250
+  THYZ_2026_Oturum3_akrid: kare 1750/2250
+  THYZ_2026_Oturum3_akrid: kare 2000/2250
+2249 cift, 792398 nokta, 588 s, 5.7 MB -> nokta_raft_final_o3_sp8.npz
+final_o2 cons uretiliyor...
+  THYZ_2026_Oturum2_azeld: kare 0/2250
+  THYZ_2026_Oturum2_azeld: kare 250/2250
+  THYZ_2026_Oturum2_azeld: kare 500/2250
+  THYZ_2026_Oturum2_azeld: kare 750/2250
+  THYZ_2026_Oturum2_azeld: kare 1000/2250
+  THYZ_2026_Oturum2_azeld: kare 1250/2250
+  THYZ_2026_Oturum2_azeld: kare 1500/2250
+  THYZ_2026_Oturum2_azeld: kare 1750/2250
+  THYZ_2026_Oturum2_azeld: kare 2000/2250
+2249 cift, 1439206 nokta, 791 s, 10.2 MB -> nokta_raft_final_o2_cons.npz
+final_o2 sp8 uretiliyor...
+  THYZ_2026_Oturum2_azeld: kare 0/2250
+  THYZ_2026_Oturum2_azeld: kare 250/2250
+  THYZ_2026_Oturum2_azeld: kare 500/2250
+  THYZ_2026_Oturum2_azeld: kare 750/2250
+  THYZ_2026_Oturum2_azeld: kare 1000/2250
+  THYZ_2026_Oturum2_azeld: kare 1250/2250
+  THYZ_2026_Oturum2_azeld: kare 1500/2250
+  THYZ_2026_Oturum2_azeld: kare 1750/2250
+  THYZ_2026_Oturum2_azeld: kare 2000/2250
+2249 cift, 1298159 nokta, 933 s, 9.4 MB -> nokta_raft_final_o2_sp8.npz
+final_test cons uretiliyor...
+  THYZ_2026_Test_Oturumu: kare 0/2250
+  THYZ_2026_Test_Oturumu: kare 250/2250
+  THYZ_2026_Test_Oturumu: kare 500/2250
+  THYZ_2026_Test_Oturumu: kare 750/2250
+  THYZ_2026_Test_Oturumu: kare 1000/2250
+  THYZ_2026_Test_Oturumu: kare 1250/2250
+  THYZ_2026_Test_Oturumu: kare 1500/2250
+  THYZ_2026_Test_Oturumu: kare 1750/2250
+  THYZ_2026_Test_Oturumu: kare 2000/2250
+2249 cift, 1446138 nokta, 894 s, 10.3 MB -> nokta_raft_final_test_cons.npz
+final_test sp8 uretiliyor...
+  THYZ_2026_Test_Oturumu: kare 0/2250
+  THYZ_2026_Test_Oturumu: kare 250/2250
+  THYZ_2026_Test_Oturumu: kare 500/2250
+  THYZ_2026_Test_Oturumu: kare 750/2250
+  THYZ_2026_Test_Oturumu: kare 1000/2250
+  THYZ_2026_Test_Oturumu: kare 1250/2250
+  THYZ_2026_Test_Oturumu: kare 1500/2250
+  THYZ_2026_Test_Oturumu: kare 1750/2250
+  THYZ_2026_Test_Oturumu: kare 2000/2250
+2249 cift, 1329968 nokta, 863 s, 9.6 MB -> nokta_raft_final_test_sp8.npz

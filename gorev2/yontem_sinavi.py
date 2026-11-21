@@ -158,6 +158,16 @@ def main():
                 and yatak_npz(y, 8, args.motor).exists()]
     eksik = [y for y in istenen if y not in yataklar]
 
+    # ZORUNLU KAPI: yatagin GT'si ile goruntusu ayni ucusa mi ait?
+    # 8 Agu 2026'da 2025 termal CSV'lerinin capraz adlandirildigi bulundu; iki yatak
+    # anlamsizdi ve yanlis bulgular uretti. "Tum saglikli" kontrolu bunu yakalamaz.
+    from nokta_onbellek import yataklari_dogrula
+    supheli = yataklari_dogrula(yataklar, args.motor, sessiz=True)
+    if supheli:
+        print(f"!!! ESLESMESI SUPHELI YATAK(LAR): {supheli}")
+        print("!!! GT ile goruntu ayni ucusa ait degil — bu yataklar ATLANIYOR.")
+        yataklar = [y for y in yataklar if y not in supheli]
+
     if args.motor_kiyas:
         _motor_kiyas(yataklar, args.motor, args.motor_kiyas, args.n_perm)
         return

@@ -75,8 +75,16 @@ def uzun_takvim(n, rng):
 
 
 # --------------------------------------------------------------------------
-def sim3_fit(A: np.ndarray, B: np.ndarray):
-    """Umeyama: B ~= s*R*A + t  (A: kaynak Nx3, B: hedef Nx3)."""
+def sim3_fit(A: np.ndarray, B: np.ndarray, aynalama: bool = False):
+    """Umeyama: B ~= s*R*A + t  (A: kaynak Nx3, B: hedef Nx3).
+
+    `aynalama=True`: R'nin det=-1 olmasina (yansima) izin ver. GEREKLI: yarisma GT
+    cercevesi, sag-el bir kamera/SfM cercevesine gore AYNALI (z asagi). Uretimdeki 2B
+    hizalama bunu zaten serbest birakiyor (`scale_alignment`: "det -1 cikabilir").
+    Olculdu (video1, COLMAP): yansima yasakken kahin hizalamada bile dusey hata 17,3 m
+    ve z, GT z ile -0,50 korelasyonlu; serbestken 6,1 m (Ekim 2026, FINAL_YENIDEN_DEGERLENDIRME).
+    Bu bayrak eklenmeden onceki SLAM turu (VGGT, ORB cekirdegi) yansima YASAK kosuldu.
+    """
     if len(A) < 3:
         return None
     mu_a, mu_b = A.mean(0), B.mean(0)
@@ -84,7 +92,7 @@ def sim3_fit(A: np.ndarray, B: np.ndarray):
     H = A0.T @ B0 / len(A)
     U, D, Vt = np.linalg.svd(H)
     S = np.eye(3)
-    if np.linalg.det(U) * np.linalg.det(Vt) < 0:
+    if not aynalama and np.linalg.det(U) * np.linalg.det(Vt) < 0:
         S[2, 2] = -1
     R = Vt.T @ S @ U.T
     var_a = (A0 ** 2).sum() / len(A)

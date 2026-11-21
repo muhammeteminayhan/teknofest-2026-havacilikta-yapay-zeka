@@ -455,6 +455,14 @@ class EstimatorConfig:
     # verilerde (Mid-Air winter/foggy) test edilince kapı tetiklendiği 7 vakanın
     # 4'ünde E'yi BOZDU (net +88 m); düşük dokulu sahnede gürültülü ölçüm bile
     # serbest sürüklenen CV'den iyi çıktı. Kaldırıldı.
+    # --- z işareti kanıt kapısı (bkz. scale_alignment.fit_alignment) ---
+    # `z_sign` tek bittir ama yanlışsa düşey kanal komple ters döner. Eski kapı
+    # ölçümün kendi gürültüsünü sinyal sanıyordu ve hiç kapanmıyordu; işaret
+    # yataklarda %26–40 oranında kararsızdı. Bu iki eşik, kararın ancak pencerede
+    # GERÇEK irtifa hareketi ve tutarlı kanıt varken verilmesini sağlar.
+    # Aksi hâlde önceki işaret korunur (başlangıç +1 = şartnamenin z-aşağı yönü).
+    z_min_hareket: float = 2.0     # penceredeki GT irtifa gezinmesi alt sınırı [m]
+    z_min_kanit: float = 0.30      # işaret tutarlılığı |Σab|/Σ|ab| alt sınırı [0-1]
 
 
 class VoPositionEstimator:
@@ -672,6 +680,8 @@ class VoPositionEstimator:
                         np.array(self._buf_E), np.array(self._buf_G),
                         np.array(self._buf_dzu), np.array(self._buf_gdz),
                         np.array(self._buf_gz), prev_z_sign=self.z_sign,
+                        z_min_hareket=self.cfg.z_min_hareket,
+                        z_min_kanit=self.cfg.z_min_kanit,
                     )
                     if fit is not None and fit.residual_ratio < self.cfg.residual_gate:
                         self.alignment = fit
@@ -790,6 +800,8 @@ class VoLadderEstimator(VoPositionEstimator):
                 np.array(self._lbuf_E), np.array(self._lbuf_G),
                 np.array(self._lbuf_dzu), np.array(self._lbuf_gdz),
                 np.array(self._lbuf_gz), prev_z_sign=self.z_sign,
+                z_min_hareket=self.cfg.z_min_hareket,
+                z_min_kanit=self.cfg.z_min_kanit,
             )
             if fit is not None and fit.residual_ratio < self.cfg.residual_gate:
                 self.alignment_ladder = fit
