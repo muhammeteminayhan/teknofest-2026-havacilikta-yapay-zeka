@@ -23,6 +23,8 @@ sunucu kareleri **teker teker** verir, sistem **kaldığı yerden** devam eder, 
       *(rembg/u2net gerekmiyor — Görev 3 rembg kapalı.)*
 - [ ] **Sunucu bilgileri doğru:** `sistem\config\.env.online`
       → `EVALUATION_SERVER_URL="http://havaciliktayapayzeka.teknofest.org:1025/"` + takım adı + şifre
+      *(Bu dosya depoda yok — `.gitignore`'da. Yeni klonda bir kez oluştur:*
+      `copy sistem\config\example.env sistem\config\.env.online` *sonra içini doldur.)*
 
 ---
 

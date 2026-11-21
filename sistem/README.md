@@ -9,8 +9,9 @@ arayüz temel alındı; üç görev buraya bağlandı ve gerçek sunucu bulgular
 ## Çalıştırma
 
 ```powershell
-# 1) online config'i aktif et (gerçek sunucu)
-Copy-Item config\.env.online config\.env
+# 1) kimlik bilgileri (bir kez) — gerçek .env depoda yok, .gitignore'da
+Copy-Item config\example.env config\.env
+notepad config\.env          # takım adı / şifre / sunucu URL'si
 
 # 2) sistem/ klasöründen çalıştır
 cd sistem

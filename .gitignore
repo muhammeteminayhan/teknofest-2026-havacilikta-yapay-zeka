@@ -88,3 +88,9 @@ docs/_rapor_metin.txt
 # final_degerlendirme.json ve orb_yataklar.txt bulgularin kaydidir.
 gorev2/outputs/final/colmap/
 gorev2/outputs/final/*.log
+
+# --- Gercek kimlik bilgileri (sunucu sifresi) — yalnizca yerel ---
+# Sablon olarak sistem/config/example.env takipli kalir; kendi .env'ini ondan kopyala.
+# Not: 2026 yarisma donemine ait eski degerler commit gecmisinde mevcut (islevsiz).
+sistem/config/.env
+sistem/config/.env.online
