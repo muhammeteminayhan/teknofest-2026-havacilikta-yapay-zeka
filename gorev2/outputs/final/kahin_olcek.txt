@@ -1,0 +1,17 @@
+yatak          takvim           yok      eski     olcek   eski fark   olcek fark
+video1         cevrimici       3.84      6.02      3.17        +57%        -17%
+video1         final          12.56     26.17      8.61       +108%        -31%
+video2         cevrimici      10.75      7.89      4.37        -27%        -59%
+video2         final          47.75     19.06     11.39        -60%        -76%
+v25_rgb_a      cevrimici       3.40      4.12      1.90        +21%        -44%
+v25_rgb_a      final           1.70      2.70      0.90        +59%        -47%
+v25_rgb_b      cevrimici      10.15      9.56      8.96         -6%        -12%
+v25_rgb_b      final          42.32     46.68     45.55        +10%         +8%
+v25_termal_a   cevrimici       4.91      6.52      2.26        +33%        -54%
+v25_termal_a   final           6.32      3.95      3.22        -37%        -49%
+v25_termal_b   cevrimici       8.12      8.95      6.71        +10%        -17%
+v25_termal_b   final          48.58     51.95     47.09         +7%         -3%
+--------------------------------------------------------------------------------
+ORTALAMA                      16.70     16.13     12.01
+  eski: 4/12 yatak-takvimde mevcuttan iyi
+  olcek: 11/12 yatak-takvimde mevcuttan iyi

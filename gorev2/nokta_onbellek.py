@@ -150,9 +150,56 @@ YATAKLAR = {
     ),
 }
 
+# --- Diyarbakir finali (18-20 Eyl 2026): bes oturum, bkz. final_yatak.py ---
+# GT yalniz saglikli karelerde var (`konum` = gonderdigimiz yorunge; saglikli karede
+# sunucunun GT'sinin aynasi). Diskte eksik kareler oldugu icin `tam_dizin` okuyucusu
+# kullanilir: kare sirasi korunur, eksik karenin yerine onceki kare verilir.
+_FINAL_KARE = Path.home() / "Desktop" / "final-diyarbakir" / "sistem" / "_images"
+for _ad, _klasor, _prof in (
+        ("final_test", "THYZ_2026_Test_Oturumu", RGB_1080P),
+        ("final_o1", "THYZ_2026_Oturum1_alvsb", RGB_1080P),
+        ("final_o2", "THYZ_2026_Oturum2_azeld", RGB_1080P),
+        ("final_o3", "THYZ_2026_Oturum3_akrid", THERMAL),
+        ("final_o4", "THYZ_2026_Oturum4_aavwo", RGB_1080P)):
+    YATAKLAR[_ad] = dict(ad=f"final {_klasor}", kareler=_FINAL_KARE / _klasor,
+                         tam_dizin=2250, gt_npz=OUTPUTS / "final" / f"{_ad}.npz",
+                         profile=_prof, ek=f"raft_{_ad}")
+
+
+def tam_dizin_kareleri(klasor, n: int, gray: bool = True, progress: bool = False):
+    """``frame_000000 .. frame_{n-1}`` sirasiyla oku; eksik karede onceki kareyi ver.
+
+    `data_io.iter_image_frames` dosyalari siralayip ordinal uretir — eksik kare olunca
+    sonraki butun kareler bir kayar ve ilk okunamayan karede durur. Burada kare
+    numarasi dosya adindan gelir; eksik karenin yerine bir onceki kare verilir
+    (donmus-kare kapisi o adimi hareketsiz sayar). Ilk kare eksikse ilk mevcut kare.
+    """
+    import cv2
+    klasor = Path(klasor)
+    yol = lambda k: klasor / f"frame_{k:06d}.webp"          # noqa: E731
+    son = None
+    for k in range(n):
+        img = cv2.imread(str(yol(k))) if yol(k).exists() else None
+        if img is None:
+            if son is None:                                    # bastaki eksik kare
+                j = next(j for j in range(k + 1, n) if yol(j).exists())
+                img = cv2.imread(str(yol(j)))
+            else:
+                img = son
+        elif gray and img.ndim == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if gray and img.ndim == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        son = img
+        if progress and k % 250 == 0:
+            print(f"  {klasor.name}: kare {k}/{n}", flush=True)
+        yield k, img
+
 
 def yatak_kareler(yatak: dict, progress: bool = True):
     """Yatagin kare akisini uret — video ise altornekli, dizin ise oldugu gibi."""
+    if "tam_dizin" in yatak:
+        return tam_dizin_kareleri(yatak["kareler"], yatak["tam_dizin"], progress=progress)
     if "kareler" in yatak:
         return data_io.iter_image_frames(yatak["kareler"], progress=progress)
     return data_io.iter_competition_frames(yatak["video"], progress=progress)

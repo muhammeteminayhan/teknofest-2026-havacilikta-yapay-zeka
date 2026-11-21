@@ -4,8 +4,8 @@ takvim : yarismanin GERCEK kesinti yapisi (703 saglikli / 1547 kesinti)
 config : yontem=homografi, spacing=8
 
 >>> RESMI METRIK (sartname Denklem 2 = PK puanini belirleyen deger) <<<
-  ortalama Oklid hatasi (TUM kareler) : 4.535 m
-  yalniz kesinti karelerinde          : 6.596 m
+  ortalama Oklid hatasi (TUM kareler) : 3.684 m
+  yalniz kesinti karelerinde          : 5.357 m
 
 kiyas tabanlari (gorsel bilgi YOK):
   'tut'       (son saglikli konumu tut) : 63.645 m
@@ -13,8 +13,8 @@ kiyas tabanlari (gorsel bilgi YOK):
 
 --- kesinti bloklari (tani) ---
             blok  uzunluk   ort hata     bitis      maks   m/kare
-   451-899            449     10.20m    15.04m    15.04m   0.0335
-  1051-1549           499      5.08m    12.23m    12.23m   0.0245
-  1651-2249           599      5.16m    12.11m    12.14m   0.0202
+   451-899            449      7.13m     8.39m     9.96m   0.0187
+  1051-1549           499      4.22m    10.87m    11.03m   0.0218
+  1651-2249           599      4.97m    10.91m    11.08m   0.0182
 
-hata persentilleri (tum kareler): medyan 3.38 | %90 12.10 | maks 15.04 m
+hata persentilleri (tum kareler): medyan 3.23 | %90 8.85 | maks 11.08 m

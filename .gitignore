@@ -82,3 +82,9 @@ docs/_rapor_metin.txt
 !video_gorseller/B2_gorev2_akis.png
 !video_gorseller/C1_gorev3_akis.png
 !video_gorseller/B3_raft.png
+
+# --- Gorev 2 final yeniden degerlendirme: COLMAP ara verisi (12 GB, yeniden uretilir) ---
+# Disa aktarilan JPEG kareler + SfM modelleri. Sonuc dosyalari (txt/json/npz/png) KALIR:
+# final_degerlendirme.json ve orb_yataklar.txt bulgularin kaydidir.
+gorev2/outputs/final/colmap/
+gorev2/outputs/final/*.log
